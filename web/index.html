@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zapret Control Panel</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">⚡</div>
+      <div class="brand-text">
+        <div class="brand-title">Zapret</div>
+        <div class="brand-sub">Control Panel</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Версия</label>
+      <select id="version-select"></select>
+    </div>
+    <button id="reload-versions" class="btn btn-ghost btn-small btn-block">Обновить список версий</button>
+
+    <nav class="nav">
+      <button class="nav-item active" data-tab="test"><span class="nav-icon">🧪</span>Тест</button>
+      <button class="nav-item" data-tab="manual"><span class="nav-icon">▶</span>Ручной запуск</button>
+      <button class="nav-item" data-tab="service"><span class="nav-icon">⚙</span>Служба</button>
+      <button class="nav-item" data-tab="diagnostics"><span class="nav-icon">🩺</span>Диагностика</button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="status-row"><span id="admin-dot" class="dot"></span><span id="admin-text">проверка...</span></div>
+      <div class="status-row"><span id="winws-dot" class="dot"></span><span id="winws-text">winws: ...</span></div>
+    </div>
+  </aside>
+
+  <main class="content">
+
+    <section id="tab-test" class="tab active">
+      <div class="tab-header">
+        <h1>Тест стратегий</h1>
+        <p class="muted">Прогоняет выбранные стратегии по выбранным сервисам и показывает, какая реально пробивает блокировку.</p>
+      </div>
+
+      <div class="grid-test">
+        <div class="left-col">
+          <div class="card strategies-card">
+            <div class="card-header">
+              <h3>Стратегии</h3>
+              <div class="card-actions">
+                <button id="select-all" class="btn btn-ghost btn-small">Все</button>
+                <button id="select-none" class="btn btn-ghost btn-small">Ничего</button>
+              </div>
+            </div>
+            <div id="strategy-list" class="strategy-list"></div>
+          </div>
+
+          <div class="card services-card">
+            <div class="card-header">
+              <h3>Сервисы</h3>
+              <div class="card-actions">
+                <button id="services-select-all" class="btn btn-ghost btn-small">Все</button>
+                <button id="services-select-none" class="btn btn-ghost btn-small">Ничего</button>
+              </div>
+            </div>
+            <div id="service-list" class="strategy-list"></div>
+          </div>
+        </div>
+
+        <div class="card main-card">
+          <div class="card-header">
+            <h3>Ход теста</h3>
+            <div class="progress-wrap">
+              <div class="progress-bar"><div id="test-progress-fill" class="progress-fill"></div></div>
+              <span id="test-progress-text" class="progress-text">0/0</span>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button id="run-test" class="btn btn-primary">Запустить тест</button>
+            <button id="stop-test" class="btn btn-danger" disabled>Остановить</button>
+          </div>
+          <pre id="test-log" class="console"></pre>
+          <div id="test-summary" class="summary-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-manual" class="tab">
+      <div class="tab-header">
+        <h1>Ручной запуск</h1>
+        <p class="muted">Запустите любую стратегию из выбранной версии напрямую, без теста.</p>
+      </div>
+      <div class="card">
+        <div class="field-row">
+          <div class="field grow">
+            <label>Стратегия</label>
+            <select id="manual-strategy"></select>
+          </div>
+          <button id="manual-launch" class="btn btn-primary">Запустить</button>
+          <button id="manual-stop" class="btn btn-danger">Остановить</button>
+        </div>
+        <div class="status-banner">
+          <span id="manual-dot" class="dot"></span>
+          <span id="manual-status-text">Проверка...</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-service" class="tab">
+      <div class="tab-header">
+        <h1>Служба</h1>
+        <p class="muted">Полный функционал service.bat — install/remove, настройки, обновления. Без консоли.</p>
+      </div>
+
+      <div class="card">
+        <h3>Автозапуск</h3>
+        <div class="field-row">
+          <div class="field grow">
+            <label>Стратегия для установки</label>
+            <select id="service-strategy"></select>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button id="service-install" class="btn btn-primary">Установить как службу</button>
+          <button id="service-remove" class="btn btn-danger">Удалить службу</button>
+          <button id="service-status" class="btn btn-ghost">Статус</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Настройки</h3>
+        <div class="setting-row">
+          <label>Игровой фильтр</label>
+          <div class="segmented" id="game-filter-segmented">
+            <button data-value="disabled">Выкл</button>
+            <button data-value="all">TCP+UDP</button>
+            <button data-value="tcp">TCP</button>
+            <button data-value="udp">UDP</button>
+          </div>
+        </div>
+        <div class="setting-row">
+          <label>Список IP (ipset)</label>
+          <div class="ipset-control">
+            <span id="ipset-status-badge" class="badge">...</span>
+            <button id="ipset-cycle" class="btn btn-ghost btn-small">Переключить</button>
+          </div>
+        </div>
+        <div class="setting-row">
+          <label>Автопроверка обновлений zapret</label>
+          <label class="switch">
+            <input type="checkbox" id="check-updates-toggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Обновления</h3>
+        <div class="btn-row">
+          <button id="update-ipset" class="btn btn-ghost">Обновить список IPSet</button>
+          <button id="update-hosts" class="btn btn-ghost">Проверить/обновить hosts</button>
+          <button id="check-updates-btn" class="btn btn-ghost">Проверить обновления zapret</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Вывод</h3>
+        <pre id="service-output" class="console"></pre>
+      </div>
+    </section>
+
+    <section id="tab-diagnostics" class="tab">
+      <div class="tab-header">
+        <h1>Диагностика</h1>
+        <p class="muted">Проверки конфликтов и здоровья системы — как в service.bat → Run Diagnostics.</p>
+      </div>
+      <div class="card">
+        <div class="btn-row">
+          <button id="run-diagnostics" class="btn btn-primary">Запустить диагностику</button>
+          <button id="remove-conflicts" class="btn btn-danger" disabled>Удалить конфликтующие службы</button>
+          <button id="fix-windivert" class="btn btn-danger" disabled>Исправить конфликт WinDivert</button>
+          <button id="clear-discord-cache" class="btn btn-ghost">Очистить кэш Discord</button>
+        </div>
+        <div id="diagnostics-results" class="diagnostics-list"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div id="toast-container"></div>
+
+<div id="modal-overlay" class="modal-overlay hidden">
+  <div class="modal">
+    <h3 id="modal-title"></h3>
+    <p id="modal-message"></p>
+    <div class="modal-actions">
+      <button id="modal-cancel" class="btn btn-ghost">Отмена</button>
+      <button id="modal-confirm" class="btn btn-danger">Подтвердить</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
