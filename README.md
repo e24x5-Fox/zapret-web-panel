@@ -1,42 +1,47 @@
 # zapret-web-panel
 
-A local web control panel for [zapret-discord-youtube](https://github.com/Flowseal/zapret-discord-youtube) (Flowseal's Windows distribution of [bol-van/zapret](https://github.com/bol-van/zapret)).
+[English version](README.en.md)
 
-**Unofficial, independent companion tool — not affiliated with or endorsed by the zapret-discord-youtube project.**
+Локальная веб-панель управления для [zapret-discord-youtube](https://github.com/Flowseal/zapret-discord-youtube) (Windows-дистрибутив [bol-van/zapret](https://github.com/bol-van/zapret) от Flowseal).
 
-It replaces `service.bat`'s console menu and the bundled `test zapret.ps1` with a single browser-based dashboard:
+**Неофициальный, независимый компаньон-инструмент — не аффилирован и не одобрен командой zapret-discord-youtube.**
 
-- **Тест (Test)** — run every (or a chosen subset of) bypass strategy against a configurable set of services, see which strategy actually gets through, and enable the winner with one click.
-- **Ручной запуск (Manual launch)** — start/stop any strategy directly, no test needed.
-- **Служба (Service)** — install/remove the autostart `zapret` Windows service, toggle game filter / ipset / auto-update settings, update the ipset list and hosts file, check for new zapret-discord-youtube releases — all without opening `service.bat`'s console.
-- **Диагностика (Diagnostics)** — the same conflict/health checks as `service.bat`'s "Run Diagnostics", plus one-click fixes: stop selected VPN services, remove conflicting bypass services, clear an orphaned WinDivert driver registration, clear Discord's cache.
+Заменяет консольное меню `service.bat` и штатный `test zapret.ps1` одной панелью в браузере (доступна на русском и английском — переключатель языка в интерфейсе):
 
-## Why
+- **Тест** — прогоняет все (или выбранные) стратегии обхода по настраиваемому набору сервисов, показывает, какая реально пробивает блокировку, включает победителя одной кнопкой.
+- **Ручной запуск** — запуск/остановка любой стратегии напрямую, без теста.
+- **Служба** — установка/удаление автозапускаемой службы Windows `zapret`, переключение игрового фильтра / ipset / автопроверки обновлений, обновление списка ipset и hosts-файла, проверка новых релизов zapret-discord-youtube — всё без открытия консоли `service.bat`.
+- **Диагностика** — те же проверки конфликтов/здоровья системы, что и в "Run Diagnostics" у `service.bat`, плюс исправления в один клик: остановка выбранных VPN-служб, удаление конфликтующих bypass-служб, чистка зависшей регистрации драйвера WinDivert, очистка кэша Discord.
 
-`zapret-discord-youtube` ships great bypass strategies but manages them through batch-file console menus. This panel is a friendlier front end over the same mechanics — it shells out to the same `winws.exe`, reads/writes the same config files, and (for service installs) captures the exact resolved command line the official `.bat` files would produce, instead of re-parsing batch syntax.
+## Зачем
 
-## Requirements
+`zapret-discord-youtube` даёт отличные стратегии обхода, но управляется через консольные меню в батниках. Эта панель — более дружелюбный интерфейс поверх той же механики: работает с тем же `winws.exe`, читает/пишет те же конфиги, а при установке службы вместо разбора синтаксиса батников считывает реальную командную строку, которую они реально порождают.
+
+## Требования
 
 - Windows 10/11
-- Python 3.9+
-- `curl.exe` and PowerShell (both ship with modern Windows)
-- One or more extracted [zapret-discord-youtube releases](https://github.com/Flowseal/zapret-discord-youtube/releases) (the folders that contain `bin/winws.exe`, `service.bat`, `general*.bat`, ...)
+- Готовый `.exe` не требует ничего лишнего — либо Python 3.9+, `curl.exe` и PowerShell (все три уже есть в современной Windows), если запускаете из исходников
+- Один или несколько распакованных [релизов zapret-discord-youtube](https://github.com/Flowseal/zapret-discord-youtube/releases) (папки с `bin/winws.exe`, `service.bat`, `general*.bat`, ...)
 
-## Install
+## Установка
 
-Clone this repo anywhere:
+### Вариант 1 — готовый .exe (проще всего)
+
+Скачайте `zapret-web-panel.exe` со страницы [Releases](../../releases) и положите рядом с папками версий zapret (или в любое место — путь к папкам версий панель спросит через переменную окружения `ZAPRET_BASE_DIR`, см. ниже).
+
+### Вариант 2 — из исходников
 
 ```
-git clone https://github.com/<your-username>/zapret-web-panel.git
+git clone https://github.com/e24x5-Fox/zapret-web-panel.git
 ```
 
-It looks for `zapret-discord-youtube-*` releases (folders containing `bin/winws.exe`) in its own folder by default. If you keep this checkout separate from your zapret releases — the normal case — point it at that folder instead with the `ZAPRET_BASE_DIR` environment variable:
+По умолчанию панель ищет папки `zapret-discord-youtube-*` (с `bin/winws.exe` внутри) рядом с собой. Если держите её отдельно от релизов zapret — обычный случай — укажите путь через переменную `ZAPRET_BASE_DIR`:
 
 ```
 Downloads/
   zapret-discord-youtube-1.9.9d/
   zapret-discord-youtube-1.9.6/
-  zapret-web-panel/          <- this repo, cloned separately
+  zapret-web-panel/          <- репозиторий отдельно
 ```
 
 ```
@@ -46,34 +51,45 @@ python zapret-web-panel\zapret_web.py
 
 (PowerShell: `$env:ZAPRET_BASE_DIR = "C:\Users\you\Downloads"`)
 
-## Run
+## Запуск
 
 ```
 python zapret_web.py
 ```
 
-It requests admin rights via UAC (required — `winws.exe` needs the WinDivert driver), starts a local server on `127.0.0.1:8756`, and opens it in your default browser.
+или просто запустите `zapret-web-panel.exe`.
 
-## Security
+Панель запросит права администратора через UAC (обязательно — `winws.exe` нужен драйвер WinDivert), поднимет локальный сервер на `127.0.0.1:8756` и откроет его в браузере по умолчанию.
 
-This server runs elevated and can install/remove Windows services and kill processes, so it's locked to localhost with two defenses beyond `bind(127.0.0.1)`:
+## Безопасность
 
-- A random token is generated on every run, embedded into the served page, and required (via a custom `X-Zapret-Token` header) on every API call. A page from another origin cannot read it and cannot forge the header without triggering a CORS preflight the server doesn't approve — this blocks both CSRF and DNS-rebinding attempts against the local API.
-- Every request's `Host` header is checked against `127.0.0.1:8756` as defense in depth.
+Сервер работает с правами администратора и умеет ставить/удалять службы Windows, поэтому кроме `bind(127.0.0.1)` есть два дополнительных барьера:
 
-## Configuring test targets
+- При каждом запуске генерируется случайный токен, встраивается в отдаваемую страницу и требуется (заголовком `X-Zapret-Token`) на каждый вызов API. Страница с другого origin не может ни прочитать этот токен, ни подделать заголовок без CORS preflight, который сервер не одобряет — это блокирует и CSRF, и DNS-rebinding атаки на локальный API.
+- Заголовок `Host` каждого запроса сверяется с `127.0.0.1:8756` как дополнительный барьер.
 
-The list of services the "Тест" tab can test against lives in `targets.json`, created next to the scripts on first run with a starter set (Discord, YouTube, Cloudflare, Telegram, Twitter/X, Instagram, Facebook, TikTok, Steam, Spotify, Twitch, Reddit). Edit it freely — format:
+## Настройка списка сервисов для теста
+
+Список сервисов, доступных на вкладке "Тест", лежит в `targets.json` — создаётся рядом со скриптами при первом запуске с базовым набором (Discord, YouTube, Cloudflare, Telegram, Twitter/X, Instagram, Facebook, TikTok, Steam, Spotify, Twitch, Reddit). Редактируется свободно, формат:
 
 ```json
 {
-  "ServiceName": [
+  "ИмяСервиса": [
     {"host": "example.com", "kind": "http"},
     {"host": "1.2.3.4", "kind": "tcp443"}
   ]
 }
 ```
 
-## License
+## Сборка .exe самостоятельно
 
-MIT — see [LICENSE](LICENSE). `zapret-discord-youtube` and `zapret` are themselves MIT-licensed by bol-van and Flowseal; this project doesn't bundle or redistribute their code, only automates the release folders you point it at.
+```
+pip install pyinstaller
+pyinstaller zapret-web-panel.spec
+```
+
+Готовый файл появится в `dist\zapret-web-panel.exe` — однофайловый, с запросом прав администратора через UAC при запуске (манифест `uac_admin=True`), веб-интерфейс (`web/`) упакован внутрь.
+
+## Лицензия
+
+MIT — см. [LICENSE](LICENSE). Сами `zapret-discord-youtube` и `zapret` тоже распространяются по MIT (bol-van, Flowseal); этот проект не включает и не переупаковывает их код, только автоматизирует работу с папками релизов, на которые вы его укажете.

@@ -18,6 +18,8 @@ import time
 import winreg
 from pathlib import Path
 
+from i18n import t
+
 IPSET_URL = "https://raw.githubusercontent.com/Flowseal/zapret-discord-youtube/refs/heads/main/.service/ipset-service.txt"
 HOSTS_URL = "https://raw.githubusercontent.com/Flowseal/zapret-discord-youtube/refs/heads/main/.service/hosts"
 GITHUB_VERSION_URL = "https://raw.githubusercontent.com/Flowseal/zapret-discord-youtube/main/.service/version.txt"
@@ -80,12 +82,12 @@ def _parse_sc_records(text: str):
     return records
 
 
-def stop_services(names) -> str:
+def stop_services(names, lang="ru") -> str:
     lines = []
     for n in names:
         res = subprocess.run(["net", "stop", n], capture_output=True, text=True, timeout=20)
         ok = res.returncode == 0
-        lines.append(f"{n}: {'остановлена' if ok else 'не удалось остановить'}")
+        lines.append(f"{n}: {t(lang, 'svc_stopped' if ok else 'svc_stop_failed')}")
     return "\n".join(lines)
 
 
@@ -109,7 +111,7 @@ def _winws_running() -> bool:
 # service install / remove / status
 # --------------------------------------------------------------------------- #
 
-def _extract_winws_command(bat_path: Path, version_dir: Path) -> str:
+def _extract_winws_command(bat_path: Path, version_dir: Path, lang="ru") -> str:
     """Briefly launch bat_path so Windows resolves the real winws.exe command
     line (all %BIN%/%LISTS%/%GameFilter% substitutions already applied by
     cmd.exe), read it back via WMI, then stop it."""
@@ -136,19 +138,19 @@ def _extract_winws_command(bat_path: Path, version_dir: Path) -> str:
     subprocess.run(["taskkill", "/IM", "winws.exe", "/F", "/T"], capture_output=True, timeout=10)
 
     if not cmdline:
-        raise RuntimeError(f"winws.exe не запустился для {bat_path.name} — не удалось прочитать его параметры.")
+        raise RuntimeError(t(lang, "winws_didnt_start", bat_name=bat_path.name))
     return cmdline
 
 
-def install_service(version_dir: Path, bat_name: str) -> str:
+def install_service(version_dir: Path, bat_name: str, lang="ru") -> str:
     bat_path = version_dir / bat_name
     if not bat_path.exists():
-        raise ValueError(f"{bat_name} не найден в {version_dir}")
+        raise ValueError(t(lang, "install_bat_not_found", bat_name=bat_name, version_dir=version_dir))
 
-    cmdline = _extract_winws_command(bat_path, version_dir)
+    cmdline = _extract_winws_command(bat_path, version_dir, lang=lang)
     m = re.match(r'^"([^"]+)"\s*(.*)$', cmdline)
     if not m:
-        raise RuntimeError(f"Не удалось разобрать командную строку winws.exe:\n{cmdline}")
+        raise RuntimeError(t(lang, "cmdline_parse_failed", cmdline=cmdline))
     exe_path, args = m.group(1), m.group(2)
 
     subprocess.run(["net", "stop", "zapret"], capture_output=True, timeout=15)
@@ -160,7 +162,7 @@ def install_service(version_dir: Path, bat_name: str) -> str:
         capture_output=True, text=True, timeout=20,
     )
     if res.returncode != 0:
-        raise RuntimeError(f"sc create не удался:\n{res.stdout}\n{res.stderr}")
+        raise RuntimeError(t(lang, "sc_create_failed", stdout=res.stdout, stderr=res.stderr))
 
     subprocess.run(["sc", "description", "zapret", "Zapret DPI bypass software"], capture_output=True, timeout=10)
     start_res = subprocess.run(["sc", "start", "zapret"], capture_output=True, text=True, timeout=20)
@@ -172,26 +174,27 @@ def install_service(version_dir: Path, bat_name: str) -> str:
     except OSError:
         pass
 
-    return f"Служба 'zapret' создана и запущена со стратегией {bat_name}.\n{start_res.stdout}{start_res.stderr}".strip()
+    extra = f"{start_res.stdout}{start_res.stderr}".strip()
+    return t(lang, "service_installed_detail", bat_name=bat_name, extra=extra).strip()
 
 
-def remove_service() -> str:
+def remove_service(lang="ru") -> str:
     lines = []
     if _service_state("zapret") is not None:
         subprocess.run(["net", "stop", "zapret"], capture_output=True, timeout=15)
         subprocess.run(["sc", "delete", "zapret"], capture_output=True, timeout=15)
-        lines.append("Служба 'zapret' остановлена и удалена.")
+        lines.append(t(lang, "service_stopped_removed"))
     else:
-        lines.append("Служба 'zapret' не была установлена.")
+        lines.append(t(lang, "service_not_installed"))
 
     if _winws_running():
         subprocess.run(["taskkill", "/IM", "winws.exe", "/F", "/T"], capture_output=True, timeout=10)
-        lines.append("Процесс winws.exe остановлен.")
+        lines.append(t(lang, "winws_process_stopped"))
 
     if _service_state("WinDivert") is not None:
         subprocess.run(["net", "stop", "WinDivert"], capture_output=True, timeout=15)
         subprocess.run(["sc", "delete", "WinDivert"], capture_output=True, timeout=15)
-        lines.append("Служба 'WinDivert' удалена.")
+        lines.append(t(lang, "windivert_removed"))
 
     subprocess.run(["net", "stop", "WinDivert14"], capture_output=True, timeout=15)
     subprocess.run(["sc", "delete", "WinDivert14"], capture_output=True, timeout=15)
@@ -209,22 +212,22 @@ def installed_strategy_name():
         return None
 
 
-def service_status(version_dir: Path) -> str:
+def service_status(version_dir: Path, lang="ru") -> str:
     lines = []
     zapret_state = _service_state("zapret")
-    lines.append(f"Служба 'zapret': {zapret_state or 'не установлена'}")
+    lines.append(t(lang, "status_zapret_line", state=zapret_state or t(lang, "status_not_installed")))
     if zapret_state:
         strat = installed_strategy_name()
         if strat:
-            lines.append(f"  Установленная стратегия: {strat}")
+            lines.append(t(lang, "status_installed_strategy", strategy=strat))
 
     windivert_state = _service_state("WinDivert")
-    lines.append(f"Служба 'WinDivert': {windivert_state or 'не установлена'}")
+    lines.append(t(lang, "status_windivert_line", state=windivert_state or t(lang, "status_not_installed")))
 
     sys_files = list((version_dir / "bin").glob("*.sys"))
-    lines.append("WinDivert64.sys: найден" if sys_files else "WinDivert64.sys: НЕ найден")
+    lines.append(t(lang, "status_sys_found" if sys_files else "status_sys_not_found"))
 
-    lines.append("winws.exe: ЗАПУЩЕН" if _winws_running() else "winws.exe: не запущен")
+    lines.append(t(lang, "status_winws_running" if _winws_running() else "status_winws_stopped"))
     return "\n".join(lines)
 
 
@@ -273,7 +276,7 @@ def ipset_status(version_dir: Path) -> str:
     return "none" if "203.0.113.113/32" in text else "loaded"
 
 
-def cycle_ipset(version_dir: Path) -> str:
+def cycle_ipset(version_dir: Path, lang="ru") -> str:
     """Advance loaded -> none -> any -> loaded, exactly like service.bat's toggle."""
     list_file = version_dir / "lists" / "ipset-all.txt"
     backup_file = version_dir / "lists" / "ipset-all.txt.backup"
@@ -289,7 +292,7 @@ def cycle_ipset(version_dir: Path) -> str:
         list_file.write_text("", encoding="utf-8")
     else:  # any
         if not backup_file.exists():
-            raise RuntimeError("Нет резервной копии для восстановления. Сначала обновите список IPSet.")
+            raise RuntimeError(t(lang, "ipset_no_backup"))
         if list_file.exists():
             list_file.unlink()
         backup_file.rename(list_file)
@@ -301,7 +304,7 @@ def cycle_ipset(version_dir: Path) -> str:
 # updates
 # --------------------------------------------------------------------------- #
 
-def update_ipset_list(version_dir: Path) -> str:
+def update_ipset_list(version_dir: Path, lang="ru") -> str:
     list_file = version_dir / "lists" / "ipset-all.txt"
     list_file.parent.mkdir(exist_ok=True)
     tmp = list_file.with_suffix(".tmp")
@@ -310,12 +313,12 @@ def update_ipset_list(version_dir: Path) -> str:
         capture_output=True, timeout=30, text=True,
     )
     if res.returncode != 0 or not tmp.exists() or tmp.stat().st_size == 0:
-        raise RuntimeError("Не удалось скачать список IPSet.")
+        raise RuntimeError(t(lang, "ipset_download_failed"))
     tmp.replace(list_file)
-    return f"ipset-all.txt обновлён ({list_file.stat().st_size} байт)."
+    return t(lang, "ipset_updated", size=list_file.stat().st_size)
 
 
-def check_hosts_file() -> str:
+def check_hosts_file(lang="ru") -> str:
     hosts_path = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "drivers" / "etc" / "hosts"
     tmp = Path(os.environ.get("TEMP", ".")) / "zapret_hosts.txt"
     res = subprocess.run(
@@ -323,21 +326,21 @@ def check_hosts_file() -> str:
         capture_output=True, timeout=20, text=True,
     )
     if res.returncode != 0 or not tmp.exists():
-        raise RuntimeError("Не удалось скачать эталонный hosts-файл.")
+        raise RuntimeError(t(lang, "hosts_download_failed"))
 
     lines = [l for l in tmp.read_text(encoding="utf-8", errors="ignore").splitlines() if l.strip()]
     if not lines:
-        raise RuntimeError("Скачанный hosts-файл пуст.")
+        raise RuntimeError(t(lang, "hosts_empty"))
     first, last = lines[0], lines[-1]
     current = hosts_path.read_text(encoding="utf-8", errors="ignore") if hosts_path.exists() else ""
 
     if first not in current or last not in current:
         subprocess.Popen(["notepad.exe", str(tmp)])
         subprocess.Popen(["explorer.exe", f"/select,{hosts_path}"])
-        return "Файл hosts нужно обновить. Открыт Notepad со скачанным файлом и проводник — скопируйте содержимое вручную."
+        return t(lang, "hosts_needs_update")
 
     tmp.unlink(missing_ok=True)
-    return "Файл hosts в актуальном состоянии."
+    return t(lang, "hosts_up_to_date")
 
 
 def local_version(version_dir: Path) -> str:
@@ -350,14 +353,14 @@ def local_version(version_dir: Path) -> str:
     return m.group(0) if m else version_dir.name
 
 
-def check_for_updates(version_dir: Path) -> dict:
+def check_for_updates(version_dir: Path, lang="ru") -> dict:
     res = subprocess.run(
         ["curl.exe", "-s", "-L", GITHUB_VERSION_URL],
         capture_output=True, timeout=15, text=True,
     )
     latest = res.stdout.strip()
     if res.returncode != 0 or not latest:
-        raise RuntimeError("Не удалось получить версию с GitHub.")
+        raise RuntimeError(t(lang, "version_fetch_failed"))
     local = local_version(version_dir)
     return {
         "local": local,
@@ -372,20 +375,20 @@ def check_for_updates(version_dir: Path) -> dict:
 # diagnostics (mirrors :service_diagnostics)
 # --------------------------------------------------------------------------- #
 
-def run_diagnostics(version_dir: Path):
-    """Returns (results, found_conflicting_services) where results is a list
-    of {"name", "level" ("ok"/"warn"/"error"), "message"} dicts."""
+def run_diagnostics(version_dir: Path, lang="ru"):
+    """Returns (results, found_conflicting_services, windivert_conflict) where
+    results is a list of {"name", "level" ("ok"/"warn"/"error"), "message"} dicts."""
     results = []
 
-    def add(name, level, msg, services=None):
-        entry = {"name": name, "level": level, "message": msg}
+    def add(name_key, level, msg, services=None):
+        entry = {"name": t(lang, name_key), "level": level, "message": msg}
         if services:
             entry["services"] = services
         results.append(entry)
 
     bfe = _service_state("BFE")
-    add("Base Filtering Engine", "ok" if bfe == "RUNNING" else "error",
-        "запущен" if bfe == "RUNNING" else "НЕ запущен — обязателен для работы zapret")
+    add("name_bfe", "ok" if bfe == "RUNNING" else "error",
+        t(lang, "bfe_ok") if bfe == "RUNNING" else t(lang, "bfe_error"))
 
     try:
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Internet Settings")
@@ -395,63 +398,63 @@ def run_diagnostics(version_dir: Path):
                 server, _ = winreg.QueryValueEx(key, "ProxyServer")
             except FileNotFoundError:
                 server = "?"
-            add("Системный прокси", "warn", f"включён: {server}. Проверьте, что он рабочий, либо отключите")
+            add("name_proxy", "warn", t(lang, "proxy_warn", server=server))
         else:
-            add("Системный прокси", "ok", "отключён")
+            add("name_proxy", "ok", t(lang, "proxy_ok"))
         winreg.CloseKey(key)
     except OSError:
-        add("Системный прокси", "ok", "не настроен")
+        add("name_proxy", "ok", t(lang, "proxy_not_configured"))
 
     out = subprocess.run(
         ["netsh", "interface", "tcp", "show", "global"], capture_output=True, text=True, timeout=10
     ).stdout
     ts_line = next((l for l in out.splitlines() if "timestamp" in l.lower()), "")
     if "enabled" in ts_line.lower():
-        add("TCP timestamps", "ok", "включены")
+        add("name_tcp_timestamps", "ok", t(lang, "ts_ok"))
     else:
         subprocess.run(
             ["netsh", "interface", "tcp", "set", "global", "timestamps=enabled"],
             capture_output=True, timeout=10,
         )
-        add("TCP timestamps", "warn", "были выключены — включены автоматически")
+        add("name_tcp_timestamps", "warn", t(lang, "ts_warn"))
 
     tl = subprocess.run(
         ["tasklist", "/FI", "IMAGENAME eq AdguardSvc.exe"], capture_output=True, text=True, timeout=10
     ).stdout
     if "adguardsvc.exe" in tl.lower():
-        add("AdGuard", "error", "процесс AdguardSvc.exe найден — может конфликтовать с Discord")
+        add("name_adguard", "error", t(lang, "adguard_error"))
     else:
-        add("AdGuard", "ok", "не найден")
+        add("name_adguard", "ok", t(lang, "adguard_ok"))
 
     services_text = _query_all_active_services()
 
-    add("Killer", "error" if _lines_containing_all(services_text, "Killer") else "ok",
-        "службы Killer найдены — конфликтуют с zapret" if _lines_containing_all(services_text, "Killer") else "не найдено")
+    add("name_killer", "error" if _lines_containing_all(services_text, "Killer") else "ok",
+        t(lang, "killer_error") if _lines_containing_all(services_text, "Killer") else t(lang, "not_found_generic"))
 
     intel_hit = _lines_containing_all(services_text, "Intel", "Connectivity", "Network")
-    add("Intel Connectivity", "error" if intel_hit else "ok",
-        "служба найдена — конфликтует с zapret" if intel_hit else "не найдено")
+    add("name_intel", "error" if intel_hit else "ok",
+        t(lang, "intel_error") if intel_hit else t(lang, "not_found_generic"))
 
     checkpoint_found = bool(_lines_containing_all(services_text, "TracSrvWrapper")) or \
         bool(_lines_containing_all(services_text, "EPWD"))
-    add("Check Point", "error" if checkpoint_found else "ok",
-        "найдено — конфликтует с zapret" if checkpoint_found else "не найдено")
+    add("name_checkpoint", "error" if checkpoint_found else "ok",
+        t(lang, "found_conflicts_generic") if checkpoint_found else t(lang, "not_found_generic"))
 
-    add("SmartByte", "error" if _lines_containing_all(services_text, "SmartByte") else "ok",
-        "найдено — конфликтует с zapret" if _lines_containing_all(services_text, "SmartByte") else "не найдено")
+    add("name_smartbyte", "error" if _lines_containing_all(services_text, "SmartByte") else "ok",
+        t(lang, "found_conflicts_generic") if _lines_containing_all(services_text, "SmartByte") else t(lang, "not_found_generic"))
 
     sys_files = list((version_dir / "bin").glob("*.sys"))
-    add("WinDivert64.sys", "ok" if sys_files else "error",
-        "найден" if sys_files else "файл не найден в bin/")
+    add("name_windivert_sys", "ok" if sys_files else "error",
+        t(lang, "sys_found") if sys_files else t(lang, "sys_missing"))
 
     vpn_records = [r for r in _parse_sc_records(services_text)
                    if "vpn" in r["display_name"].lower() or "vpn" in r["name"].lower()]
     if vpn_records:
         labels = ", ".join(r["display_name"] or r["name"] for r in vpn_records)
-        add("VPN", "warn", f"найдены службы VPN: {labels}. Могут конфликтовать с zapret",
+        add("name_vpn", "warn", t(lang, "vpn_found", labels=labels),
             services=[{"name": r["name"], "display_name": r["display_name"] or r["name"]} for r in vpn_records])
     else:
-        add("VPN", "ok", "не найдено")
+        add("name_vpn", "ok", t(lang, "not_found_generic"))
 
     ps = ("(Get-ChildItem -Recurse -Path 'HKLM:System\\CurrentControlSet\\Services\\Dnscache\\"
           "InterfaceSpecificParameters\\' | Get-ItemProperty | "
@@ -461,32 +464,29 @@ def run_diagnostics(version_dir: Path):
         doh_count = int((r.stdout or "0").strip() or "0")
     except ValueError:
         doh_count = 0
-    add("Secure DNS (DoH)", "ok" if doh_count > 0 else "warn",
-        "настроен хотя бы на одном интерфейсе" if doh_count > 0
-        else "не настроен — рекомендуется включить DNS через HTTPS в браузере или Windows 11")
+    add("name_doh", "ok" if doh_count > 0 else "warn",
+        t(lang, "doh_ok") if doh_count > 0 else t(lang, "doh_warn"))
 
     hosts_path = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "drivers" / "etc" / "hosts"
     if hosts_path.exists():
         h = hosts_path.read_text(encoding="utf-8", errors="ignore").lower()
         yt_found = "youtube.com" in h or "youtu.be" in h
-        add("Hosts file", "warn" if yt_found else "ok",
-            "содержит записи youtube.com/youtu.be — может мешать доступу к YouTube" if yt_found
-            else "не содержит подозрительных записей YouTube")
+        add("name_hosts_file", "warn" if yt_found else "ok",
+            t(lang, "hosts_check_warn") if yt_found else t(lang, "hosts_check_ok"))
 
     windivert_state = _service_state("WinDivert")
     winws_conflict = (not _winws_running()) and windivert_state in ("RUNNING", "STOP_PENDING")
-    add("WinDivert конфликт", "warn" if winws_conflict else "ok",
-        "winws не запущен, но служба WinDivert активна — возможен конфликт с другим bypass-инструментом"
-        if winws_conflict else "не обнаружено")
+    add("name_windivert_conflict", "warn" if winws_conflict else "ok",
+        t(lang, "windivert_conflict_warn") if winws_conflict else t(lang, "windivert_conflict_ok"))
 
     found_conflicts = [n for n in CONFLICTING_BYPASS_SERVICES if _service_state(n) is not None]
-    add("Конфликтующие bypass-службы", "error" if found_conflicts else "ok",
-        f"найдены: {', '.join(found_conflicts)}" if found_conflicts else "не найдено")
+    add("name_conflicting_services", "error" if found_conflicts else "ok",
+        t(lang, "conflicts_found", names=", ".join(found_conflicts)) if found_conflicts else t(lang, "not_found_generic"))
 
     return results, found_conflicts, winws_conflict
 
 
-def fix_windivert_conflict() -> str:
+def fix_windivert_conflict(lang="ru") -> str:
     """Stop and remove an orphaned WinDivert driver service (winws.exe not
     running but the driver still registered/active) — mirrors what
     service.bat's diagnostics attempts automatically in this situation."""
@@ -494,26 +494,26 @@ def fix_windivert_conflict() -> str:
     for name in ("WinDivert", "WinDivert14"):
         state = _service_state(name)
         if state is None:
-            lines.append(f"{name}: не установлена")
+            lines.append(t(lang, "windivert_not_installed", name=name))
             continue
         subprocess.run(["net", "stop", name], capture_output=True, timeout=15)
         res = subprocess.run(["sc", "delete", name], capture_output=True, text=True, timeout=15)
-        lines.append(f"{name}: удалена" if res.returncode == 0 else f"{name}: не удалось удалить")
+        lines.append(t(lang, "svc_removed_short" if res.returncode == 0 else "svc_remove_failed_short", name=name))
     return "\n".join(lines)
 
 
-def remove_conflicting_services(names) -> str:
+def remove_conflicting_services(names, lang="ru") -> str:
     lines = []
     for n in names:
         subprocess.run(["net", "stop", n], capture_output=True, timeout=15)
         subprocess.run(["sc", "delete", n], capture_output=True, timeout=15)
-        lines.append(f"{n}: остановлена и удалена (если существовала)")
+        lines.append(t(lang, "svc_stopped_removed_maybe", name=n))
     subprocess.run(["net", "stop", "WinDivert"], capture_output=True, timeout=15)
     subprocess.run(["sc", "delete", "WinDivert"], capture_output=True, timeout=15)
     return "\n".join(lines)
 
 
-def clear_discord_cache() -> str:
+def clear_discord_cache(lang="ru") -> str:
     subprocess.run(["taskkill", "/IM", "Discord.exe", "/F"], capture_output=True, timeout=10)
     base = Path(os.environ.get("APPDATA", "")) / "discord"
     removed = []
@@ -522,4 +522,5 @@ def clear_discord_cache() -> str:
         if p.exists():
             shutil.rmtree(p, ignore_errors=True)
             removed.append(sub)
-    return f"Discord закрыт. Удалены папки: {', '.join(removed) if removed else 'не найдены'}"
+    folders = ", ".join(removed) if removed else t(lang, "discord_no_folders")
+    return t(lang, "discord_cache_cleared", folders=folders)

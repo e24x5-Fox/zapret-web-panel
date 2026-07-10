@@ -3,7 +3,10 @@
 const API = {
   async get(path) {
     const res = await fetch(path, {
-      headers: { "X-Zapret-Token": window.ZAPRET_TOKEN || "" },
+      headers: {
+        "X-Zapret-Token": window.ZAPRET_TOKEN || "",
+        "X-Zapret-Lang": getLang(),
+      },
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.error || res.statusText);
@@ -15,6 +18,7 @@ const API = {
       headers: {
         "Content-Type": "application/json",
         "X-Zapret-Token": window.ZAPRET_TOKEN || "",
+        "X-Zapret-Lang": getLang(),
       },
       body: JSON.stringify(payload || {}),
     });
@@ -167,7 +171,7 @@ $("version-select").addEventListener("change", async (e) => {
 $("reload-versions").addEventListener("click", async () => {
   await loadVersions();
   await loadStrategiesForAllTabs();
-  toast("Список версий обновлён", "info");
+  toast(t("msg_versions_reloaded"), "info");
 });
 
 // ------------------------------------------------------------------ //
@@ -178,10 +182,10 @@ async function loadEnv() {
   try {
     const env = await API.get("/api/env");
     setDotStatus("admin-dot", env.admin);
-    $("admin-text").textContent = env.admin ? "Администратор" : "НЕТ прав администратора";
-    if (!env.curl) toast("curl.exe не найден в PATH — тесты не будут работать", "error");
+    $("admin-text").textContent = env.admin ? t("admin_yes") : t("admin_no");
+    if (!env.curl) toast(t("err_curl_not_found"), "error");
     if (env.zapret_service_installed) {
-      toast("Служба 'zapret' сейчас установлена — тест недоступен, пока она не удалена", "info");
+      toast(t("msg_service_installed_warning"), "info");
     }
   } catch (e) { /* ignore */ }
 }
@@ -190,9 +194,9 @@ async function pollWinwsStatus() {
   try {
     const { running } = await API.get("/api/manual/status");
     setDotStatus("winws-dot", running);
-    $("winws-text").textContent = running ? "winws: запущен" : "winws: остановлен";
+    $("winws-text").textContent = running ? t("winws_running") : t("winws_stopped");
     setDotStatus("manual-dot", running);
-    $("manual-status-text").textContent = running ? "winws ЗАПУЩЕН" : "winws остановлен";
+    $("manual-status-text").textContent = running ? t("winws_running_caps") : t("winws_stopped2");
   } catch (e) { /* ignore */ }
 }
 
@@ -245,14 +249,14 @@ function summaryRow(label, value, stratName) {
         <div class="summary-label">${escapeHtml(label)}</div>
         <div class="summary-value">${escapeHtml(value)}</div>
       </div>
-      <button class="btn btn-primary btn-small" data-activate="${escapeHtml(stratName)}">Включить</button>
+      <button class="btn btn-primary btn-small" data-activate="${escapeHtml(stratName)}">${t("btn_enable")}</button>
     </div>`;
 }
 
 function renderTestSummary(best, reportPath) {
   const container = $("test-summary");
   if (!best) {
-    container.innerHTML = `<div class="muted">Ни одна стратегия не дала результатов.</div>`;
+    container.innerHTML = `<div class="muted">${t("msg_no_results")}</div>`;
     return;
   }
   let html = "";
@@ -260,11 +264,11 @@ function renderTestSummary(best, reportPath) {
     html += summaryRow(service, `${info.strategy} (${info.score}/${info.total})`, info.strategy);
   }
   if (best.overall) {
-    html += summaryRow("Лучшая в целом",
+    html += summaryRow(t("label_best_overall"),
       `${best.overall.strategy} (${best.overall.score}/${best.overall.total})`, best.overall.strategy);
   }
   if (reportPath) {
-    html += `<div class="muted small">Отчёт сохранён: ${escapeHtml(reportPath)}</div>`;
+    html += `<div class="muted small">${escapeHtml(t("label_report_saved"))}${escapeHtml(reportPath)}</div>`;
   }
   container.innerHTML = html;
   container.querySelectorAll("[data-activate]").forEach((btn) => {
@@ -275,23 +279,22 @@ function renderTestSummary(best, reportPath) {
 async function activateStrategy(name) {
   try {
     await API.post("/api/manual/launch", { version: state.version, strategy: name });
-    toast(`Запущена стратегия: ${name}`, "success");
+    toast(t("msg_strategy_launched", { name }), "success");
   } catch (e) {
     toast(e.message, "error");
   }
 }
 
 async function startTest() {
-  if (!state.version) return toast("Выберите версию", "error");
+  if (!state.version) return toast(t("err_select_version"), "error");
   const strategies = getSelectedStrategies();
-  if (!strategies.length) return toast("Выберите хотя бы одну стратегию", "error");
+  if (!strategies.length) return toast(t("err_select_strategy"), "error");
   const services = getSelectedServices();
-  if (!services.length) return toast("Выберите хотя бы один сервис", "error");
+  if (!services.length) return toast(t("err_select_service"), "error");
 
   const ok = await confirmModal(
-    "Запустить тест?",
-    `Будет протестировано ${strategies.length} стратегий(и) по сервисам: ${services.join(", ")}.\n` +
-    "На время теста ваш текущий winws будет остановлен (после теста восстановится)."
+    t("confirm_run_test_title"),
+    t("confirm_run_test_msg", { count: strategies.length, services: services.join(", ") })
   );
   if (!ok) return;
 
@@ -346,14 +349,14 @@ $("manual-launch").addEventListener("click", async () => {
   if (!state.version || !strategy) return;
   try {
     await API.post("/api/manual/launch", { version: state.version, strategy });
-    toast(`Запущено: ${strategy}`, "success");
+    toast(t("msg_launched", { strategy }), "success");
   } catch (e) { toast(e.message, "error"); }
 });
 
 $("manual-stop").addEventListener("click", async () => {
   try {
     await API.post("/api/manual/stop", {});
-    toast("winws.exe остановлен", "success");
+    toast(t("msg_winws_stopped"), "success");
   } catch (e) { toast(e.message, "error"); }
 });
 
@@ -388,7 +391,7 @@ $("game-filter-segmented").addEventListener("click", async (e) => {
   setSegmentedValue("game-filter-segmented", btn.dataset.value);
   try {
     await API.post("/api/service/settings/game_filter", { version: state.version, mode: btn.dataset.value });
-    logService(`Игровой фильтр: ${btn.dataset.value}. Перезапустите стратегию, чтобы применить.`);
+    logService(t("log_game_filter_set", { mode: btn.dataset.value }));
   } catch (e) { toast(e.message, "error"); }
 });
 
@@ -397,7 +400,7 @@ $("ipset-cycle").addEventListener("click", async () => {
   try {
     const { status } = await API.post("/api/service/settings/ipset_cycle", { version: state.version });
     $("ipset-status-badge").textContent = status;
-    logService(`Список IP переключён на: ${status}`);
+    logService(t("log_ipset_switched", { status }));
   } catch (e) { toast(e.message, "error"); }
 });
 
@@ -405,7 +408,7 @@ $("check-updates-toggle").addEventListener("change", async (e) => {
   if (!state.version) return;
   try {
     await API.post("/api/service/settings/check_updates", { version: state.version, enabled: e.target.checked });
-    logService(`Автопроверка обновлений: ${e.target.checked ? "включена" : "выключена"}`);
+    logService(t("log_check_updates_toggled", { state: e.target.checked ? t("state_enabled") : t("state_disabled") }));
   } catch (err) { toast(err.message, "error"); }
 });
 
@@ -413,76 +416,75 @@ $("service-install").addEventListener("click", async () => {
   const strategy = $("service-strategy").value;
   if (!state.version || !strategy) return;
   const ok = await confirmModal(
-    "Установить службу?",
-    `Стратегия «${strategy}» будет установлена как автозапускаемая служба Windows 'zapret'.\n` +
-    "Это изменение сохранится после перезагрузки."
+    t("confirm_install_service_title"),
+    t("confirm_install_service_msg", { strategy })
   );
   if (!ok) return;
-  logService(`>>> Установка службы: ${strategy}`);
+  logService(t("log_installing_service", { strategy }));
   try {
     const { output } = await API.post("/api/service/install", { version: state.version, strategy });
     logService(output);
-    toast("Служба установлена", "success");
+    toast(t("msg_service_installed"), "success");
   } catch (e) {
-    logService(`Ошибка: ${e.message}`);
+    logService(t("label_error_prefix", { message: e.message }));
     toast(e.message, "error");
   }
 });
 
 $("service-remove").addEventListener("click", async () => {
-  const ok = await confirmModal("Удалить службу?", "Удалить службу 'zapret', если она установлена?");
+  const ok = await confirmModal(t("confirm_remove_service_title"), t("confirm_remove_service_msg"));
   if (!ok) return;
-  logService(">>> Удаление службы");
+  logService(t("log_removing_service"));
   try {
     const { output } = await API.post("/api/service/remove", {});
     logService(output);
-    toast("Служба удалена (если была установлена)", "success");
+    toast(t("msg_service_removed"), "success");
   } catch (e) {
-    logService(`Ошибка: ${e.message}`);
+    logService(t("label_error_prefix", { message: e.message }));
     toast(e.message, "error");
   }
 });
 
 $("service-status").addEventListener("click", async () => {
   if (!state.version) return;
-  logService(">>> Проверка статуса");
+  logService(t("log_checking_status"));
   try {
     const { text } = await API.get(`/api/service/status?version=${encodeURIComponent(state.version)}`);
     logService(text);
-  } catch (e) { logService(`Ошибка: ${e.message}`); }
+  } catch (e) { logService(t("label_error_prefix", { message: e.message })); }
 });
 
 $("update-ipset").addEventListener("click", async () => {
   if (!state.version) return;
-  logService(">>> Обновление списка IPSet");
+  logService(t("log_updating_ipset"));
   try {
     const { output } = await API.post("/api/service/update/ipset", { version: state.version });
     logService(output);
     const s = await API.get(`/api/service/settings?version=${encodeURIComponent(state.version)}`);
     $("ipset-status-badge").textContent = s.ipset;
-  } catch (e) { logService(`Ошибка: ${e.message}`); }
+  } catch (e) { logService(t("label_error_prefix", { message: e.message })); }
 });
 
 $("update-hosts").addEventListener("click", async () => {
-  logService(">>> Проверка hosts-файла");
+  logService(t("log_checking_hosts"));
   try {
     const { output } = await API.post("/api/service/update/hosts", {});
     logService(output);
-  } catch (e) { logService(`Ошибка: ${e.message}`); }
+  } catch (e) { logService(t("label_error_prefix", { message: e.message })); }
 });
 
 $("check-updates-btn").addEventListener("click", async () => {
   if (!state.version) return;
-  logService(">>> Проверка обновлений zapret");
+  logService(t("log_checking_updates"));
   try {
     const info = await API.post("/api/service/update/check", { version: state.version });
     if (info.up_to_date) {
-      logService(`Установлена последняя версия: ${info.local}`);
+      logService(t("log_latest_version", { version: info.local }));
     } else {
-      logService(`Установлена: ${info.local}, доступна новая: ${info.latest}\nСтраница релиза: ${info.release_url}`);
+      logService(t("log_new_version_available", { local: info.local, latest: info.latest, url: info.release_url }));
       window.open(info.download_url, "_blank");
     }
-  } catch (e) { logService(`Ошибка: ${e.message}`); }
+  } catch (e) { logService(t("label_error_prefix", { message: e.message })); }
 });
 
 // ------------------------------------------------------------------ //
@@ -501,7 +503,7 @@ function renderDiagnostics(results) {
       servicesHtml = `
         <div class="diag-services">
           ${items}
-          <button class="btn btn-danger btn-small" data-stop-row="${idx}">Остановить выбранные</button>
+          <button class="btn btn-danger btn-small" data-stop-row="${idx}">${t("btn_stop_selected")}</button>
         </div>`;
     }
     return `
@@ -523,8 +525,8 @@ function renderDiagnostics(results) {
 async function stopSelectedServices(rowIdx) {
   const checked = [...document.querySelectorAll(`.service-checkbox[data-row="${rowIdx}"]:checked`)]
     .map((cb) => cb.value);
-  if (!checked.length) return toast("Ничего не выбрано", "error");
-  const ok = await confirmModal("Остановить службы?", "Будут остановлены:\n" + checked.join(", "));
+  if (!checked.length) return toast(t("err_nothing_selected"), "error");
+  const ok = await confirmModal(t("confirm_stop_services_title"), t("confirm_stop_services_msg", { names: checked.join(", ") }));
   if (!ok) return;
   try {
     const { output } = await API.post("/api/diagnostics/stop_services", { names: checked });
@@ -534,7 +536,7 @@ async function stopSelectedServices(rowIdx) {
 
 $("run-diagnostics").addEventListener("click", async () => {
   if (!state.version) return;
-  $("diagnostics-results").innerHTML = `<div class="muted">Выполняется диагностика...</div>`;
+  $("diagnostics-results").innerHTML = `<div class="muted">${t("msg_diagnostics_running")}</div>`;
   $("remove-conflicts").disabled = true;
   $("fix-windivert").disabled = true;
   try {
@@ -545,16 +547,12 @@ $("run-diagnostics").addEventListener("click", async () => {
     $("remove-conflicts").disabled = conflicts.length === 0;
     $("fix-windivert").disabled = !windivert_conflict;
   } catch (e) {
-    $("diagnostics-results").innerHTML = `<div class="muted">Ошибка: ${escapeHtml(e.message)}</div>`;
+    $("diagnostics-results").innerHTML = `<div class="muted">${escapeHtml(t("label_error_prefix", { message: e.message }))}</div>`;
   }
 });
 
 $("fix-windivert").addEventListener("click", async () => {
-  const ok = await confirmModal(
-    "Исправить конфликт WinDivert?",
-    "Служба WinDivert (драйвер перехвата трафика) будет остановлена и удалена — " +
-    "она переустановится автоматически при следующем запуске любой стратегии."
-  );
+  const ok = await confirmModal(t("confirm_fix_windivert_title"), t("confirm_fix_windivert_msg"));
   if (!ok) return;
   try {
     const { output } = await API.post("/api/diagnostics/fix_windivert", {});
@@ -566,8 +564,8 @@ $("fix-windivert").addEventListener("click", async () => {
 $("remove-conflicts").addEventListener("click", async () => {
   if (!lastConflicts.length) return;
   const ok = await confirmModal(
-    "Удалить конфликтующие службы?",
-    "Будут остановлены и удалены службы:\n" + lastConflicts.join(", ")
+    t("confirm_remove_conflicts_title"),
+    t("confirm_remove_conflicts_msg", { names: lastConflicts.join(", ") })
   );
   if (!ok) return;
   try {
@@ -578,11 +576,7 @@ $("remove-conflicts").addEventListener("click", async () => {
 });
 
 $("clear-discord-cache").addEventListener("click", async () => {
-  const ok = await confirmModal(
-    "Очистить кэш Discord?",
-    "Discord будет закрыт, а его папки Cache/Code Cache/GPUCache — удалены.\n" +
-    "Discord пересоздаст их при следующем запуске."
-  );
+  const ok = await confirmModal(t("confirm_clear_discord_title"), t("confirm_clear_discord_msg"));
   if (!ok) return;
   try {
     const { output } = await API.post("/api/diagnostics/clear_discord_cache", {});

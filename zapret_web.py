@@ -19,9 +19,18 @@ from urllib.parse import parse_qs, urlparse
 
 import zapret_tester as zt
 import zapret_service as zs
+from i18n import t
+
+def _resource_dir() -> Path:
+    """Where bundled read-only assets (web/) live: PyInstaller's onefile
+    temp extraction dir when packaged, this script's folder otherwise."""
+    if getattr(sys, "frozen", False):
+        return Path(sys._MEIPASS)
+    return Path(__file__).resolve().parent
+
 
 BASE_DIR = zt.BASE_DIR
-WEB_DIR = Path(__file__).resolve().parent / "web"
+WEB_DIR = _resource_dir() / "web"
 PORT = 8756
 
 # Fresh per-run secret. This server runs elevated and can install/remove
@@ -100,12 +109,12 @@ class TestSession:
 test_session = TestSession()
 
 
-def _version_dir(name):
+def _version_dir(name, lang="ru"):
     if not name:
-        raise ValueError("Версия не указана")
+        raise ValueError(t(lang, "err_version_not_specified"))
     vd = BASE_DIR / name
     if not vd.exists() or not (vd / "bin" / "winws.exe").exists():
-        raise ValueError(f"Неизвестная версия: {name}")
+        raise ValueError(t(lang, "err_unknown_version", name=name))
     return vd
 
 
@@ -143,6 +152,10 @@ class Handler(BaseHTTPRequestHandler):
     def _token_ok(self) -> bool:
         return secrets.compare_digest(self.headers.get("X-Zapret-Token", ""), SECRET_TOKEN)
 
+    def _lang(self) -> str:
+        lang = self.headers.get("X-Zapret-Lang", "ru")
+        return lang if lang in ("ru", "en") else "ru"
+
     # -- routing ----------------------------------------------------- #
 
     def do_GET(self):
@@ -151,6 +164,7 @@ class Handler(BaseHTTPRequestHandler):
 
         parsed = urlparse(self.path)
         path, qs = parsed.path, parse_qs(parsed.query)
+        lang = self._lang()
 
         if path.startswith("/api/") and not self._token_ok():
             return self._send_error_json("unauthorized", 401)
@@ -161,7 +175,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json({"versions": [v.name for v in versions]})
 
             if path == "/api/strategies":
-                vd = _version_dir(qs.get("version", [None])[0])
+                vd = _version_dir(qs.get("version", [None])[0], lang)
                 return self._send_json({"strategies": [b.name for b in zt.find_strategies(vd)]})
 
             if path == "/api/services":
@@ -177,11 +191,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json({"running": zt.winws_running()})
 
             if path == "/api/service/status":
-                vd = _version_dir(qs.get("version", [None])[0])
-                return self._send_json({"text": zs.service_status(vd)})
+                vd = _version_dir(qs.get("version", [None])[0], lang)
+                return self._send_json({"text": zs.service_status(vd, lang)})
 
             if path == "/api/service/settings":
-                vd = _version_dir(qs.get("version", [None])[0])
+                vd = _version_dir(qs.get("version", [None])[0], lang)
                 return self._send_json({
                     "game_filter": zs.game_filter_status(vd),
                     "ipset": zs.ipset_status(vd),
@@ -217,9 +231,9 @@ class Handler(BaseHTTPRequestHandler):
             handler = self._POST_ROUTES.get(path)
             if handler is None:
                 return self._send_error_json("not found", 404)
-            return handler(self, data)
+            return handler(self, data, self._lang())
         except KeyError as e:
-            self._send_error_json(f"отсутствует поле: {e}", 400)
+            self._send_error_json(f"missing field: {e}", 400)
         except ValueError as e:
             self._send_error_json(str(e), 400)
         except Exception as e:
@@ -227,27 +241,27 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- POST action implementations ---------------------------------- #
 
-    def _test_start(self, data):
+    def _test_start(self, data, lang):
         if test_session.running:
-            return self._send_error_json("Тест уже выполняется")
-        vd = _version_dir(data["version"])
+            return self._send_error_json(t(lang, "err_test_already_running"))
+        vd = _version_dir(data["version"], lang)
         names = data.get("strategies") or []
         all_bats = {b.name: b for b in zt.find_strategies(vd)}
         bats = [all_bats[n] for n in names if n in all_bats]
         if not bats:
-            return self._send_error_json("Стратегии не найдены")
+            return self._send_error_json(t(lang, "err_strategies_not_found"))
 
         service_names = data.get("services") or []
         targets = {k: v for k, v in zt.TARGETS.items() if k in service_names} or zt.TARGETS
         if not targets:
-            return self._send_error_json("Сервисы не найдены")
+            return self._send_error_json(t(lang, "err_services_not_found"))
 
         test_session.reset(vd.name, len(bats))
 
         def worker():
             results = zt.run_tests(
                 vd, bats, targets=targets, log=test_session.append_log,
-                should_stop=lambda: test_session.stop_requested,
+                should_stop=lambda: test_session.stop_requested, lang=lang,
             )
             best = None
             report_path = None
@@ -271,78 +285,78 @@ class Handler(BaseHTTPRequestHandler):
         threading.Thread(target=worker, daemon=True).start()
         return self._send_json({"ok": True})
 
-    def _test_stop(self, data):
+    def _test_stop(self, data, lang):
         test_session.stop_requested = True
         return self._send_json({"ok": True})
 
-    def _manual_launch(self, data):
-        vd = _version_dir(data["version"])
+    def _manual_launch(self, data, lang):
+        vd = _version_dir(data["version"], lang)
         bat = vd / data["strategy"]
         if not bat.exists():
-            raise ValueError(f"Стратегия не найдена: {data['strategy']}")
+            raise ValueError(t(lang, "err_strategy_not_found", strategy=data["strategy"]))
         zt.launch_strategy(bat, vd)
         return self._send_json({"ok": True})
 
-    def _manual_stop(self, data):
+    def _manual_stop(self, data, lang):
         zt.kill_winws()
         return self._send_json({"ok": True})
 
-    def _service_install(self, data):
-        vd = _version_dir(data["version"])
-        out = zs.install_service(vd, data["strategy"])
+    def _service_install(self, data, lang):
+        vd = _version_dir(data["version"], lang)
+        out = zs.install_service(vd, data["strategy"], lang)
         return self._send_json({"ok": True, "output": out})
 
-    def _service_remove(self, data):
-        out = zs.remove_service()
+    def _service_remove(self, data, lang):
+        out = zs.remove_service(lang)
         return self._send_json({"ok": True, "output": out})
 
-    def _settings_game_filter(self, data):
-        vd = _version_dir(data["version"])
+    def _settings_game_filter(self, data, lang):
+        vd = _version_dir(data["version"], lang)
         zs.set_game_filter(vd, data["mode"])
         return self._send_json({"ok": True})
 
-    def _settings_ipset_cycle(self, data):
-        vd = _version_dir(data["version"])
-        return self._send_json({"ok": True, "status": zs.cycle_ipset(vd)})
+    def _settings_ipset_cycle(self, data, lang):
+        vd = _version_dir(data["version"], lang)
+        return self._send_json({"ok": True, "status": zs.cycle_ipset(vd, lang)})
 
-    def _settings_check_updates(self, data):
-        vd = _version_dir(data["version"])
+    def _settings_check_updates(self, data, lang):
+        vd = _version_dir(data["version"], lang)
         zs.set_check_updates_enabled(vd, bool(data.get("enabled")))
         return self._send_json({"ok": True})
 
-    def _update_ipset(self, data):
-        vd = _version_dir(data["version"])
-        return self._send_json({"ok": True, "output": zs.update_ipset_list(vd)})
+    def _update_ipset(self, data, lang):
+        vd = _version_dir(data["version"], lang)
+        return self._send_json({"ok": True, "output": zs.update_ipset_list(vd, lang)})
 
-    def _update_hosts(self, data):
-        return self._send_json({"ok": True, "output": zs.check_hosts_file()})
+    def _update_hosts(self, data, lang):
+        return self._send_json({"ok": True, "output": zs.check_hosts_file(lang)})
 
-    def _update_check(self, data):
-        vd = _version_dir(data["version"])
-        return self._send_json(zs.check_for_updates(vd))
+    def _update_check(self, data, lang):
+        vd = _version_dir(data["version"], lang)
+        return self._send_json(zs.check_for_updates(vd, lang))
 
-    def _diagnostics_run(self, data):
-        vd = _version_dir(data["version"])
-        results, conflicts, windivert_conflict = zs.run_diagnostics(vd)
+    def _diagnostics_run(self, data, lang):
+        vd = _version_dir(data["version"], lang)
+        results, conflicts, windivert_conflict = zs.run_diagnostics(vd, lang)
         return self._send_json({
             "results": results, "conflicts": conflicts, "windivert_conflict": windivert_conflict,
         })
 
-    def _diagnostics_remove_conflicts(self, data):
-        out = zs.remove_conflicting_services(data.get("names") or [])
+    def _diagnostics_remove_conflicts(self, data, lang):
+        out = zs.remove_conflicting_services(data.get("names") or [], lang)
         return self._send_json({"ok": True, "output": out})
 
-    def _diagnostics_clear_discord(self, data):
-        return self._send_json({"ok": True, "output": zs.clear_discord_cache()})
+    def _diagnostics_clear_discord(self, data, lang):
+        return self._send_json({"ok": True, "output": zs.clear_discord_cache(lang)})
 
-    def _diagnostics_stop_services(self, data):
+    def _diagnostics_stop_services(self, data, lang):
         names = data.get("names") or []
         if not names:
-            raise ValueError("Не выбрано ни одной службы")
-        return self._send_json({"ok": True, "output": zs.stop_services(names)})
+            raise ValueError(t(lang, "err_no_service_selected"))
+        return self._send_json({"ok": True, "output": zs.stop_services(names, lang)})
 
-    def _diagnostics_fix_windivert(self, data):
-        return self._send_json({"ok": True, "output": zs.fix_windivert_conflict()})
+    def _diagnostics_fix_windivert(self, data, lang):
+        return self._send_json({"ok": True, "output": zs.fix_windivert_conflict(lang)})
 
     _POST_ROUTES = {
         "/api/test/start": _test_start,
@@ -398,11 +412,14 @@ class Handler(BaseHTTPRequestHandler):
 # --------------------------------------------------------------------------- #
 
 def _relaunch_as_admin():
-    print("Нужны права администратора, запрашиваю...")
+    # No web UI (and so no chosen language) exists yet at this point, so
+    # these bootstrap console lines are printed in both languages.
+    print("Нужны права администратора, запрашиваю... / Admin rights required, requesting...")
     params = " ".join(f'"{a}"' for a in sys.argv)
     rc = ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, params, str(BASE_DIR), 1)
     if rc <= 32:
-        print("Не удалось получить права администратора. Запустите вручную от админа.")
+        print("Не удалось получить права администратора. Запустите вручную от админа. / "
+              "Failed to get admin rights. Please run as administrator manually.")
         sys.exit(1)
     sys.exit(0)
 
@@ -417,8 +434,8 @@ def main():
     print("=" * 60)
     print(" ZAPRET WEB PANEL")
     print("=" * 60)
-    print(f"Открываю {url}")
-    print("Закройте это окно, чтобы остановить панель.")
+    print(f"Открываю / Opening: {url}")
+    print("Закройте это окно, чтобы остановить панель. / Close this window to stop the panel.")
 
     threading.Timer(0.6, lambda: webbrowser.open(url)).start()
     try:

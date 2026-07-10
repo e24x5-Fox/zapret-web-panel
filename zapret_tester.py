@@ -20,14 +20,28 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-# Folder to scan for zapret-discord-youtube-* releases. Defaults to this
-# script's own folder (so it works if you drop it next to your existing
+from i18n import t
+
+
+def _app_dir() -> Path:
+    """Folder the app 'lives in' from the user's point of view: next to the
+    running .exe when packaged (PyInstaller sets sys.frozen and __file__
+    would otherwise resolve inside its temp extraction dir), or this
+    script's own folder when running from source."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
+_APP_DIR = _app_dir()
+
+# Folder to scan for zapret-discord-youtube-* releases. Defaults to the
+# app's own folder (so it works if you drop it next to your existing
 # versions, as before); set ZAPRET_BASE_DIR to point elsewhere if you keep
 # this tool in its own separate folder/repo checkout.
-BASE_DIR = Path(os.environ["ZAPRET_BASE_DIR"]) if os.environ.get("ZAPRET_BASE_DIR") \
-    else Path(__file__).resolve().parent
-RESULTS_DIR = Path(__file__).resolve().parent / "test_results"
-TARGETS_FILE = Path(__file__).resolve().parent / "targets.json"
+BASE_DIR = Path(os.environ["ZAPRET_BASE_DIR"]) if os.environ.get("ZAPRET_BASE_DIR") else _APP_DIR
+RESULTS_DIR = _APP_DIR / "test_results"
+TARGETS_FILE = _APP_DIR / "targets.json"
 
 # Default service -> hosts catalog, written to targets.json on first run so
 # it's user-editable (add/remove services or hosts) without touching code —
@@ -379,7 +393,7 @@ def launch_strategy(bat_path: Path, version_dir: Path):
     run_strategy_bat(bat_path, version_dir)
 
 
-def test_one_strategy(bat_path: Path, version_dir: Path, targets=None, log=lambda msg: None):
+def test_one_strategy(bat_path: Path, version_dir: Path, targets=None, log=lambda msg: None, lang="ru"):
     targets = TARGETS if targets is None else targets
     launch_strategy(bat_path, version_dir)
 
@@ -392,7 +406,7 @@ def test_one_strategy(bat_path: Path, version_dir: Path, targets=None, log=lambd
     time.sleep(STRATEGY_WARMUP_SECONDS)
 
     if not winws_running():
-        log("    [WARN] winws.exe не запустился для этой стратегии — пропуск.")
+        log(t(lang, "strategy_didnt_start"))
         return None
 
     service_results = {}
@@ -414,7 +428,7 @@ def test_one_strategy(bat_path: Path, version_dir: Path, targets=None, log=lambd
     return service_results
 
 
-def run_tests(version_dir: Path, bats, targets=None, log=print, should_stop=lambda: False):
+def run_tests(version_dir: Path, bats, targets=None, log=print, should_stop=lambda: False, lang="ru"):
     """Run every bat in `bats` against `targets` (a {service: [(host, kind)]}
     subset of TARGETS, or all of TARGETS if omitted), restoring the user's
     prior winws state afterwards. Returns {bat_name: service_results}."""
@@ -423,10 +437,10 @@ def run_tests(version_dir: Path, bats, targets=None, log=print, should_stop=lamb
     try:
         for i, bat in enumerate(bats, 1):
             if should_stop():
-                log("Остановлено пользователем.")
+                log(t(lang, "stopped_by_user"))
                 break
             log(f"[{i}/{len(bats)}] {bat.name}")
-            res = test_one_strategy(bat, version_dir, targets=targets, log=log)
+            res = test_one_strategy(bat, version_dir, targets=targets, log=log, lang=lang)
             if res is None:
                 continue
             all_results[bat.name] = res

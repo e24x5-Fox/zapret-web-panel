@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 test_results/
 targets.json
+build/
+dist/
