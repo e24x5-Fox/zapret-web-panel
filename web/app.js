@@ -31,6 +31,7 @@ const API = {
 const state = {
   version: null,
   versions: [],
+  paths: {},
   strategies: [],
 };
 
@@ -102,32 +103,175 @@ function renderSelect(id, items) {
 }
 
 // ------------------------------------------------------------------ //
-// tabs
+// console menu (accordion) — replaces the old sidebar tab switcher
 // ------------------------------------------------------------------ //
 
-document.querySelectorAll(".nav-item").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".nav-item").forEach((b) => b.classList.remove("active"));
-    document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
-    btn.classList.add("active");
-    $(`tab-${btn.dataset.tab}`).classList.add("active");
+function closeAllMenuPanels() {
+  document.querySelectorAll(".menu-panel.open").forEach((p) => p.classList.remove("open"));
+  document.querySelectorAll(".menu-item.active").forEach((i) => i.classList.remove("active"));
+}
+
+function toggleMenuPanel(item) {
+  const panel = $(item.dataset.target);
+  if (!panel) return;
+  const wasOpen = panel.classList.contains("open");
+  closeAllMenuPanels();
+  if (!wasOpen) {
+    panel.classList.add("open");
+    item.classList.add("active");
+  }
+}
+
+document.querySelectorAll(".menu-item").forEach((item) => {
+  item.setAttribute("role", "button");
+  item.setAttribute("tabindex", "0");
+  item.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      if (item.dataset.target) toggleMenuPanel(item);
+      else item.click();
+    }
   });
+});
+
+document.querySelectorAll(".menu-item[data-target]").forEach((item) => {
+  item.addEventListener("click", () => toggleMenuPanel(item));
 });
 
 // ------------------------------------------------------------------ //
 // version / strategies loading
 // ------------------------------------------------------------------ //
 
-async function loadVersions() {
-  const { versions } = await API.get("/api/versions");
+async function loadVersions(rescan) {
+  const { versions, paths } = await API.get(`/api/versions${rescan ? "?rescan=1" : ""}`);
   state.versions = versions;
+  state.paths = paths || {};
   const sel = $("version-select");
   sel.innerHTML = versions.map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
   if (versions.length) {
     sel.value = versions[versions.length - 1];
     state.version = sel.value;
+  } else {
+    state.version = null;
+    toast(t("err_no_versions_found"), "error");
   }
+  renderFoundPaths();
 }
+
+// ------------------------------------------------------------------ //
+// version-scan mode (whole computer vs. one specific folder)
+// ------------------------------------------------------------------ //
+
+let scanSettings = { mode: "global", custom_dir: null };
+
+function renderScanSettings() {
+  document.querySelectorAll("#scan-mode-segmented button").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.value === scanSettings.mode);
+  });
+  $("scan-custom-row").style.display = scanSettings.mode === "custom" ? "flex" : "none";
+  $("scan-custom-dir-text").textContent = scanSettings.custom_dir || t("label_no_custom_dir");
+}
+
+async function loadScanSettings() {
+  try {
+    scanSettings = await API.get("/api/scan/settings");
+  } catch (e) { /* ignore */ }
+  renderScanSettings();
+}
+
+function renderFoundPaths() {
+  const container = $("found-paths");
+  const names = state.versions || [];
+  if (!names.length) {
+    container.innerHTML = `<div class="muted">${t("found_paths_empty")}</div>`;
+    return;
+  }
+  container.innerHTML = names.map((name) => `
+    <div class="found-path-row">
+      <span class="found-path-name">${escapeHtml(name)}</span>
+      <span class="found-path-value" title="${escapeHtml(state.paths[name] || "")}">${escapeHtml(state.paths[name] || "")}</span>
+      <button class="found-path-open" data-open="${escapeHtml(name)}">${t("btn_open_folder")}</button>
+      <button class="found-path-delete" data-delete="${escapeHtml(name)}">${t("btn_delete_folder")}</button>
+    </div>
+  `).join("");
+  container.querySelectorAll("[data-open]").forEach((btn) => {
+    btn.addEventListener("click", () => openFolder(btn.dataset.open));
+  });
+  container.querySelectorAll("[data-delete]").forEach((btn) => {
+    btn.addEventListener("click", () => deleteFolder(btn.dataset.delete));
+  });
+}
+
+async function openFolder(name) {
+  try {
+    await API.post("/api/open_folder", { name });
+  } catch (e) { toast(e.message, "error"); }
+}
+
+async function deleteFolder(name) {
+  const path = (state.paths && state.paths[name]) || name;
+  const ok = await confirmModal(t("confirm_delete_folder_title"), t("confirm_delete_folder_msg", { path }));
+  if (!ok) return;
+  try {
+    await API.post("/api/delete_folder", { name });
+    toast(t("msg_folder_deleted"), "success");
+    await loadVersions();
+    await loadStrategiesForAllTabs();
+  } catch (e) { toast(e.message, "error"); }
+}
+
+$("toggle-found-paths").addEventListener("click", () => {
+  const container = $("found-paths");
+  const isOpen = container.classList.toggle("open");
+  $("toggle-found-paths").textContent = isOpen ? t("btn_hide_paths") : t("btn_show_paths");
+});
+
+document.addEventListener("zapret:langchange", () => {
+  const isOpen = $("found-paths").classList.contains("open");
+  $("toggle-found-paths").textContent = isOpen ? t("btn_hide_paths") : t("btn_show_paths");
+  renderScanSettings();
+});
+
+document.querySelectorAll("#scan-mode-segmented button").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    if (btn.dataset.value === scanSettings.mode) return;
+    if (btn.dataset.value === "global") {
+      try {
+        await API.post("/api/scan/settings", { mode: "global", custom_dir: null });
+        scanSettings = { mode: "global", custom_dir: scanSettings.custom_dir };
+        renderScanSettings();
+        toast(t("msg_scan_settings_saved"), "info");
+        await loadVersions(true);
+        await loadStrategiesForAllTabs();
+      } catch (e) { toast(e.message, "error"); }
+    } else {
+      scanSettings.mode = "custom";
+      renderScanSettings();
+    }
+  });
+});
+
+$("scan-pick-folder").addEventListener("click", async () => {
+  const btn = $("scan-pick-folder");
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = t("btn_picking_folder");
+  try {
+    const { path } = await API.post("/api/scan/pick_folder", {});
+    if (!path) return;
+    await API.post("/api/scan/settings", { mode: "custom", custom_dir: path });
+    scanSettings = { mode: "custom", custom_dir: path };
+    renderScanSettings();
+    toast(t("msg_scan_settings_saved"), "info");
+    await loadVersions(true);
+    await loadStrategiesForAllTabs();
+  } catch (e) {
+    toast(e.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+});
 
 async function loadStrategiesForAllTabs() {
   if (!state.version) return;
@@ -169,9 +313,18 @@ $("version-select").addEventListener("change", async (e) => {
 });
 
 $("reload-versions").addEventListener("click", async () => {
-  await loadVersions();
-  await loadStrategiesForAllTabs();
-  toast(t("msg_versions_reloaded"), "info");
+  const btn = $("reload-versions");
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = t("msg_scanning");
+  try {
+    await loadVersions(true);
+    await loadStrategiesForAllTabs();
+    toast(t("msg_versions_reloaded"), "info");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
 });
 
 // ------------------------------------------------------------------ //
@@ -375,12 +528,18 @@ function setSegmentedValue(containerId, value) {
   [...container.children].forEach((btn) => btn.classList.toggle("active", btn.dataset.value === value));
 }
 
+function syncStateBadge(id, value) {
+  $(id).textContent = `[${value}]`;
+}
+
 async function loadServiceSettings() {
   if (!state.version) return;
   try {
     const s = await API.get(`/api/service/settings?version=${encodeURIComponent(state.version)}`);
     setSegmentedValue("game-filter-segmented", s.game_filter);
-    $("ipset-status-badge").textContent = s.ipset;
+    syncStateBadge("state-gamefilter", s.game_filter === "disabled" ? t("gf_disabled") : s.game_filter.toUpperCase());
+    syncStateBadge("state-ipset", s.ipset);
+    syncStateBadge("state-autoupdate", s.check_updates ? t("state_enabled") : t("state_disabled"));
     $("check-updates-toggle").checked = s.check_updates;
   } catch (e) { /* ignore */ }
 }
@@ -389,6 +548,7 @@ $("game-filter-segmented").addEventListener("click", async (e) => {
   const btn = e.target.closest("button");
   if (!btn || !state.version) return;
   setSegmentedValue("game-filter-segmented", btn.dataset.value);
+  syncStateBadge("state-gamefilter", btn.dataset.value === "disabled" ? t("gf_disabled") : btn.dataset.value.toUpperCase());
   try {
     await API.post("/api/service/settings/game_filter", { version: state.version, mode: btn.dataset.value });
     logService(t("log_game_filter_set", { mode: btn.dataset.value }));
@@ -399,16 +559,18 @@ $("ipset-cycle").addEventListener("click", async () => {
   if (!state.version) return;
   try {
     const { status } = await API.post("/api/service/settings/ipset_cycle", { version: state.version });
-    $("ipset-status-badge").textContent = status;
+    syncStateBadge("state-ipset", status);
     logService(t("log_ipset_switched", { status }));
   } catch (e) { toast(e.message, "error"); }
 });
 
 $("check-updates-toggle").addEventListener("change", async (e) => {
   if (!state.version) return;
+  const label = e.target.checked ? t("state_enabled") : t("state_disabled");
   try {
     await API.post("/api/service/settings/check_updates", { version: state.version, enabled: e.target.checked });
-    logService(t("log_check_updates_toggled", { state: e.target.checked ? t("state_enabled") : t("state_disabled") }));
+    syncStateBadge("state-autoupdate", label);
+    logService(t("log_check_updates_toggled", { state: label }));
   } catch (err) { toast(err.message, "error"); }
 });
 
@@ -461,7 +623,7 @@ $("update-ipset").addEventListener("click", async () => {
     const { output } = await API.post("/api/service/update/ipset", { version: state.version });
     logService(output);
     const s = await API.get(`/api/service/settings?version=${encodeURIComponent(state.version)}`);
-    $("ipset-status-badge").textContent = s.ipset;
+    syncStateBadge("state-ipset", s.ipset);
   } catch (e) { logService(t("label_error_prefix", { message: e.message })); }
 });
 
@@ -591,6 +753,7 @@ $("clear-discord-cache").addEventListener("click", async () => {
 (async function init() {
   await loadEnv();
   await loadServiceCatalog();
+  await loadScanSettings();
   await loadVersions();
   await loadStrategiesForAllTabs();
   pollWinwsStatus();
