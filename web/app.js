@@ -31,6 +31,7 @@ const API = {
 const state = {
   version: null,
   versions: [],
+  paths: {},
   strategies: [],
 };
 
@@ -102,76 +103,245 @@ function renderSelect(id, items) {
 }
 
 // ------------------------------------------------------------------ //
-// tabs
+// console menu (accordion) — replaces the old sidebar tab switcher
 // ------------------------------------------------------------------ //
 
-document.querySelectorAll(".nav-item").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".nav-item").forEach((b) => b.classList.remove("active"));
-    document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
-    btn.classList.add("active");
-    $(`tab-${btn.dataset.tab}`).classList.add("active");
+function closeAllMenuPanels() {
+  document.querySelectorAll(".menu-panel.open").forEach((p) => p.classList.remove("open"));
+  document.querySelectorAll(".menu-item.active").forEach((i) => i.classList.remove("active"));
+}
+
+function toggleMenuPanel(item) {
+  const panel = $(item.dataset.target);
+  if (!panel) return;
+  const wasOpen = panel.classList.contains("open");
+  closeAllMenuPanels();
+  if (!wasOpen) {
+    panel.classList.add("open");
+    item.classList.add("active");
+  }
+}
+
+document.querySelectorAll(".menu-item").forEach((item) => {
+  item.setAttribute("role", "button");
+  item.setAttribute("tabindex", "0");
+  item.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      if (item.dataset.target) toggleMenuPanel(item);
+      else item.click();
+    }
   });
+});
+
+document.querySelectorAll(".menu-item[data-target]").forEach((item) => {
+  item.addEventListener("click", () => toggleMenuPanel(item));
 });
 
 // ------------------------------------------------------------------ //
 // version / strategies loading
 // ------------------------------------------------------------------ //
 
-async function loadVersions() {
-  const { versions } = await API.get("/api/versions");
+async function loadVersions(rescan) {
+  const { versions, paths } = await API.get(`/api/versions${rescan ? "?rescan=1" : ""}`);
   state.versions = versions;
+  state.paths = paths || {};
   const sel = $("version-select");
   sel.innerHTML = versions.map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
   if (versions.length) {
     sel.value = versions[versions.length - 1];
     state.version = sel.value;
+  } else {
+    state.version = null;
+    toast(t("err_no_versions_found"), "error");
   }
+  $("home-version-label").textContent = state.version ? t("home_version_label", { version: state.version }) : "";
+  renderFoundPaths();
 }
+
+// ------------------------------------------------------------------ //
+// version-scan mode (whole computer vs. one specific folder)
+// ------------------------------------------------------------------ //
+
+let scanSettings = { mode: "global", custom_dir: null };
+
+function renderScanSettings() {
+  document.querySelectorAll("#scan-mode-segmented button").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.value === scanSettings.mode);
+  });
+  $("scan-custom-row").style.display = scanSettings.mode === "custom" ? "flex" : "none";
+  $("scan-custom-dir-text").textContent = scanSettings.custom_dir || t("label_no_custom_dir");
+}
+
+async function loadScanSettings() {
+  try {
+    scanSettings = await API.get("/api/scan/settings");
+  } catch (e) { /* ignore */ }
+  renderScanSettings();
+}
+
+function renderFoundPaths() {
+  const container = $("found-paths");
+  const names = state.versions || [];
+  if (!names.length) {
+    container.innerHTML = `<div class="muted">${t("found_paths_empty")}</div>`;
+    return;
+  }
+  container.innerHTML = names.map((name) => `
+    <div class="found-path-row">
+      <span class="found-path-name">${escapeHtml(name)}</span>
+      <span class="found-path-value" title="${escapeHtml(state.paths[name] || "")}">${escapeHtml(state.paths[name] || "")}</span>
+      <button class="found-path-open" data-open="${escapeHtml(name)}">${t("btn_open_folder")}</button>
+      <button class="found-path-delete" data-delete="${escapeHtml(name)}">${t("btn_delete_folder")}</button>
+    </div>
+  `).join("");
+  container.querySelectorAll("[data-open]").forEach((btn) => {
+    btn.addEventListener("click", () => openFolder(btn.dataset.open));
+  });
+  container.querySelectorAll("[data-delete]").forEach((btn) => {
+    btn.addEventListener("click", () => deleteFolder(btn.dataset.delete));
+  });
+}
+
+async function openFolder(name) {
+  try {
+    await API.post("/api/open_folder", { name });
+  } catch (e) { toast(e.message, "error"); }
+}
+
+async function deleteFolder(name) {
+  const path = (state.paths && state.paths[name]) || name;
+  const ok = await confirmModal(t("confirm_delete_folder_title"), t("confirm_delete_folder_msg", { path }));
+  if (!ok) return;
+  try {
+    await API.post("/api/delete_folder", { name });
+    toast(t("msg_folder_deleted"), "success");
+    await loadVersions();
+    await loadStrategiesForAllTabs();
+  } catch (e) { toast(e.message, "error"); }
+}
+
+$("toggle-found-paths").addEventListener("click", () => {
+  const container = $("found-paths");
+  const isOpen = container.classList.toggle("open");
+  $("toggle-found-paths").textContent = isOpen ? t("btn_hide_paths") : t("btn_show_paths");
+});
+
+document.addEventListener("zapret:langchange", () => {
+  const isOpen = $("found-paths").classList.contains("open");
+  $("toggle-found-paths").textContent = isOpen ? t("btn_hide_paths") : t("btn_show_paths");
+  renderScanSettings();
+});
+
+document.querySelectorAll("#scan-mode-segmented button").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    if (btn.dataset.value === scanSettings.mode) return;
+    if (btn.dataset.value === "global") {
+      try {
+        await API.post("/api/scan/settings", { mode: "global", custom_dir: null });
+        scanSettings = { mode: "global", custom_dir: scanSettings.custom_dir };
+        renderScanSettings();
+        toast(t("msg_scan_settings_saved"), "info");
+        await loadVersions(true);
+        await loadStrategiesForAllTabs();
+      } catch (e) { toast(e.message, "error"); }
+    } else {
+      scanSettings.mode = "custom";
+      renderScanSettings();
+    }
+  });
+});
+
+$("scan-pick-folder").addEventListener("click", async () => {
+  const btn = $("scan-pick-folder");
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = t("btn_picking_folder");
+  try {
+    const { path } = await API.post("/api/scan/pick_folder", {});
+    if (!path) return;
+    await API.post("/api/scan/settings", { mode: "custom", custom_dir: path });
+    scanSettings = { mode: "custom", custom_dir: path };
+    renderScanSettings();
+    toast(t("msg_scan_settings_saved"), "info");
+    await loadVersions(true);
+    await loadStrategiesForAllTabs();
+  } catch (e) {
+    toast(e.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+});
 
 async function loadStrategiesForAllTabs() {
   if (!state.version) return;
   const { strategies } = await API.get(`/api/strategies?version=${encodeURIComponent(state.version)}`);
   state.strategies = strategies;
   renderTestStrategyList(strategies);
-  renderSelect("manual-strategy", strategies);
+  renderSelect("hero-strategy-select", strategies);
   renderSelect("service-strategy", strategies);
+  updateConnectUI();
   await loadServiceSettings();
 }
 
 const DEFAULT_CHECKED_SERVICES = new Set(["Discord", "YouTube", "Cloudflare"]);
 
-async function loadServiceCatalog() {
-  const { services } = await API.get("/api/services");
-  $("service-list").innerHTML = Object.entries(services).map(([name, hosts]) => `
+function renderServiceChecklist(containerId, className, services) {
+  $(containerId).innerHTML = Object.entries(services).map(([name, hosts]) => `
     <label class="strategy-item" title="${escapeHtml(hosts.join(", "))}">
-      <input type="checkbox" class="service-checkbox-filter" value="${escapeHtml(name)}"
+      <input type="checkbox" class="${className}" value="${escapeHtml(name)}"
         ${DEFAULT_CHECKED_SERVICES.has(name) ? "checked" : ""}>
       <span>${escapeHtml(name)}</span>
     </label>
   `).join("");
 }
 
-function getSelectedServices() {
-  return [...document.querySelectorAll(".service-checkbox-filter:checked")].map((cb) => cb.value);
+function getSelectedFromClass(className) {
+  return [...document.querySelectorAll(`.${className}:checked`)].map((cb) => cb.value);
 }
 
-$("services-select-all").addEventListener("click", () => {
-  document.querySelectorAll(".service-checkbox-filter").forEach((cb) => (cb.checked = true));
-});
-$("services-select-none").addEventListener("click", () => {
-  document.querySelectorAll(".service-checkbox-filter").forEach((cb) => (cb.checked = false));
-});
+function wireSelectAllNone(selectAllId, selectNoneId, className) {
+  $(selectAllId).addEventListener("click", () => {
+    document.querySelectorAll(`.${className}`).forEach((cb) => (cb.checked = true));
+  });
+  $(selectNoneId).addEventListener("click", () => {
+    document.querySelectorAll(`.${className}`).forEach((cb) => (cb.checked = false));
+  });
+}
+
+async function loadServiceCatalog() {
+  const { services } = await API.get("/api/services");
+  renderServiceChecklist("service-list", "service-checkbox-filter", services);
+  renderServiceChecklist("generator-service-list", "gen-service-checkbox-filter", services);
+}
+
+function getSelectedServices() {
+  return getSelectedFromClass("service-checkbox-filter");
+}
+
+wireSelectAllNone("services-select-all", "services-select-none", "service-checkbox-filter");
+wireSelectAllNone("generator-services-select-all", "generator-services-select-none", "gen-service-checkbox-filter");
 
 $("version-select").addEventListener("change", async (e) => {
   state.version = e.target.value;
+  $("home-version-label").textContent = state.version ? t("home_version_label", { version: state.version }) : "";
   await loadStrategiesForAllTabs();
 });
 
 $("reload-versions").addEventListener("click", async () => {
-  await loadVersions();
-  await loadStrategiesForAllTabs();
-  toast(t("msg_versions_reloaded"), "info");
+  const btn = $("reload-versions");
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = t("msg_scanning");
+  try {
+    await loadVersions(true);
+    await loadStrategiesForAllTabs();
+    toast(t("msg_versions_reloaded"), "info");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
 });
 
 // ------------------------------------------------------------------ //
@@ -183,6 +353,7 @@ async function loadEnv() {
     const env = await API.get("/api/env");
     setDotStatus("admin-dot", env.admin);
     $("admin-text").textContent = env.admin ? t("admin_yes") : t("admin_no");
+    $("home-admin-warning").style.display = env.admin ? "none" : "block";
     if (!env.curl) toast(t("err_curl_not_found"), "error");
     if (env.zapret_service_installed) {
       toast(t("msg_service_installed_warning"), "info");
@@ -190,13 +361,15 @@ async function loadEnv() {
   } catch (e) { /* ignore */ }
 }
 
+let winwsRunning = false;
+
 async function pollWinwsStatus() {
   try {
     const { running } = await API.get("/api/manual/status");
+    winwsRunning = running;
     setDotStatus("winws-dot", running);
     $("winws-text").textContent = running ? t("winws_running") : t("winws_stopped");
-    setDotStatus("manual-dot", running);
-    $("manual-status-text").textContent = running ? t("winws_running_caps") : t("winws_stopped2");
+    updateConnectUI();
   } catch (e) { /* ignore */ }
 }
 
@@ -341,24 +514,216 @@ $("run-test").addEventListener("click", startTest);
 $("stop-test").addEventListener("click", stopTest);
 
 // ------------------------------------------------------------------ //
-// Ручной запуск tab
+// Подбор стратегии (generator) tab
 // ------------------------------------------------------------------ //
 
-$("manual-launch").addEventListener("click", async () => {
-  const strategy = $("manual-strategy").value;
-  if (!state.version || !strategy) return;
-  try {
-    await API.post("/api/manual/launch", { version: state.version, strategy });
-    toast(t("msg_launched", { strategy }), "success");
-  } catch (e) { toast(e.message, "error"); }
+let generatorMode = "simple";
+let generatorLogCursor = 0;
+let generatorPollTimer = null;
+
+document.querySelectorAll("#generator-mode-segmented button").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    generatorMode = btn.dataset.value;
+    setSegmentedValue("generator-mode-segmented", generatorMode);
+    $("generator-mode-hint").textContent = t(
+      generatorMode === "simple" ? "generator_mode_simple_hint" : "generator_mode_advanced_hint"
+    );
+  });
 });
 
-$("manual-stop").addEventListener("click", async () => {
+function setGeneratorRunningUI(running) {
+  $("run-generator").disabled = running;
+  $("stop-generator").disabled = !running;
+}
+
+function updateGeneratorProgress({ done, total }) {
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  $("generator-progress-fill").style.width = pct + "%";
+  $("generator-progress-text").textContent = `${done}/${total}`;
+}
+
+function appendGeneratorLogLines(lines) {
+  if (!lines || !lines.length) return;
+  const el = $("generator-log");
+  el.textContent += lines.join("\n") + "\n";
+  el.scrollTop = el.scrollHeight;
+}
+
+async function saveCandidate(name, btn) {
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = t("msg_saving");
   try {
-    await API.post("/api/manual/stop", {});
-    toast(t("msg_winws_stopped"), "success");
-  } catch (e) { toast(e.message, "error"); }
+    const { path } = await API.post("/api/generator/save", { version: state.version, candidate: name, save_as: name });
+    toast(t("msg_strategy_saved", { path }), "success");
+    await loadStrategiesForAllTabs();
+  } catch (e) {
+    toast(e.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+
+function generatorSummaryRow(label, value, candidateName) {
+  const row = document.createElement("div");
+  row.className = "summary-row";
+  row.innerHTML = `
+    <div>
+      <div class="summary-label">${escapeHtml(label)}</div>
+      <div class="summary-value">${escapeHtml(value)}</div>
+    </div>
+    <button class="btn btn-primary btn-small">${t("btn_save_strategy")}</button>`;
+  row.querySelector("button").addEventListener("click", (e) => saveCandidate(candidateName, e.target));
+  return row;
+}
+
+function renderGeneratorSummary(snap) {
+  const container = $("generator-summary");
+  container.innerHTML = "";
+
+  if (snap.baseline) {
+    const baselineText = Object.entries(snap.baseline).map(([svc, d]) => `${svc} ${d.score}/${d.total}`).join(", ");
+    const el = document.createElement("div");
+    el.className = "muted small";
+    el.textContent = `${t("label_baseline")}: ${baselineText}`;
+    container.appendChild(el);
+  }
+
+  if (!snap.best) {
+    const el = document.createElement("div");
+    el.className = "muted";
+    el.textContent = t("msg_no_results");
+    container.appendChild(el);
+    return;
+  }
+
+  for (const [service, info] of Object.entries(snap.best.per_service)) {
+    container.appendChild(generatorSummaryRow(service, `${info.strategy} (${info.score}/${info.total})`, info.strategy));
+  }
+  if (snap.best.overall) {
+    container.appendChild(generatorSummaryRow(
+      t("label_best_overall"),
+      `${snap.best.overall.strategy} (${snap.best.overall.score}/${snap.best.overall.total})`,
+      snap.best.overall.strategy
+    ));
+  }
+}
+
+async function startGenerator() {
+  if (!state.version) return toast(t("err_select_version"), "error");
+  const services = getSelectedFromClass("gen-service-checkbox-filter");
+  if (!services.length) return toast(t("err_select_service"), "error");
+
+  const ok = await confirmModal(t("confirm_run_generator_title"), t("confirm_run_generator_msg", { services: services.join(", ") }));
+  if (!ok) return;
+
+  $("generator-log").textContent = "";
+  $("generator-summary").innerHTML = "";
+  generatorLogCursor = 0;
+  updateGeneratorProgress({ done: 0, total: 0 });
+  setGeneratorRunningUI(true);
+
+  try {
+    await API.post("/api/generator/start", { version: state.version, mode: generatorMode, services });
+  } catch (e) {
+    toast(e.message, "error");
+    setGeneratorRunningUI(false);
+    return;
+  }
+  pollGenerator();
+}
+
+function pollGenerator() {
+  clearInterval(generatorPollTimer);
+  generatorPollTimer = setInterval(async () => {
+    try {
+      const snap = await API.get(`/api/generator/status?since=${generatorLogCursor}`);
+      appendGeneratorLogLines(snap.log);
+      generatorLogCursor = snap.log_len;
+      updateGeneratorProgress(snap.progress);
+      if (!snap.running) {
+        clearInterval(generatorPollTimer);
+        setGeneratorRunningUI(false);
+        renderGeneratorSummary(snap);
+      }
+    } catch (e) { /* transient — keep polling */ }
+  }, 700);
+}
+
+async function stopGenerator() {
+  try {
+    await API.post("/api/generator/stop", {});
+  } catch (e) { /* ignore */ }
+}
+
+$("run-generator").addEventListener("click", startGenerator);
+$("stop-generator").addEventListener("click", stopGenerator);
+
+// ------------------------------------------------------------------ //
+// home screen — VPN-style connect circle (manual launch/stop)
+// ------------------------------------------------------------------ //
+
+function updateConnectUI() {
+  const circle = $("connect-circle");
+  const select = $("hero-strategy-select");
+  const strategy = select.value;
+
+  circle.classList.toggle("connected", winwsRunning);
+  select.disabled = winwsRunning;
+
+  const statusEl = $("connect-status");
+  statusEl.classList.toggle("connected", winwsRunning);
+  statusEl.textContent = winwsRunning ? t("home_status_connected") : t("home_status_disconnected");
+
+  if (winwsRunning) {
+    $("connect-sub").textContent = t("home_sub_connected", { strategy: strategy || "" });
+  } else if (strategy) {
+    $("connect-sub").textContent = t("home_sub_disconnected", { strategy });
+  } else {
+    $("connect-sub").textContent = t("home_sub_no_strategy");
+  }
+}
+
+$("hero-strategy-select").addEventListener("change", updateConnectUI);
+
+$("connect-circle").addEventListener("click", async () => {
+  if (!state.version) return toast(t("err_select_version"), "error");
+  const circle = $("connect-circle");
+  circle.classList.add("busy");
+  try {
+    if (winwsRunning) {
+      await API.post("/api/manual/stop", {});
+      toast(t("msg_winws_stopped"), "success");
+    } else {
+      const strategy = $("hero-strategy-select").value;
+      if (!strategy) { toast(t("err_select_strategy"), "error"); return; }
+      await API.post("/api/manual/launch", { version: state.version, strategy });
+      toast(t("msg_launched", { strategy }), "success");
+    }
+  } catch (e) {
+    toast(e.message, "error");
+  } finally {
+    circle.classList.remove("busy");
+    await pollWinwsStatus();
+  }
 });
+
+// ------------------------------------------------------------------ //
+// home <-> settings view switching
+// ------------------------------------------------------------------ //
+
+function switchView(showId, hideId) {
+  const show = $(showId);
+  const hide = $(hideId);
+  hide.classList.remove("visible");
+  show.classList.add("active");
+  requestAnimationFrame(() => requestAnimationFrame(() => show.classList.add("visible")));
+  setTimeout(() => hide.classList.remove("active"), 260);
+}
+
+$("open-settings").addEventListener("click", () => switchView("view-settings", "view-home"));
+$("close-settings").addEventListener("click", () => switchView("view-home", "view-settings"));
 
 // ------------------------------------------------------------------ //
 // Служба tab
@@ -375,12 +740,18 @@ function setSegmentedValue(containerId, value) {
   [...container.children].forEach((btn) => btn.classList.toggle("active", btn.dataset.value === value));
 }
 
+function syncStateBadge(id, value) {
+  $(id).textContent = `[${value}]`;
+}
+
 async function loadServiceSettings() {
   if (!state.version) return;
   try {
     const s = await API.get(`/api/service/settings?version=${encodeURIComponent(state.version)}`);
     setSegmentedValue("game-filter-segmented", s.game_filter);
-    $("ipset-status-badge").textContent = s.ipset;
+    syncStateBadge("state-gamefilter", s.game_filter === "disabled" ? t("gf_disabled") : s.game_filter.toUpperCase());
+    syncStateBadge("state-ipset", s.ipset);
+    syncStateBadge("state-autoupdate", s.check_updates ? t("state_enabled") : t("state_disabled"));
     $("check-updates-toggle").checked = s.check_updates;
   } catch (e) { /* ignore */ }
 }
@@ -389,6 +760,7 @@ $("game-filter-segmented").addEventListener("click", async (e) => {
   const btn = e.target.closest("button");
   if (!btn || !state.version) return;
   setSegmentedValue("game-filter-segmented", btn.dataset.value);
+  syncStateBadge("state-gamefilter", btn.dataset.value === "disabled" ? t("gf_disabled") : btn.dataset.value.toUpperCase());
   try {
     await API.post("/api/service/settings/game_filter", { version: state.version, mode: btn.dataset.value });
     logService(t("log_game_filter_set", { mode: btn.dataset.value }));
@@ -399,16 +771,18 @@ $("ipset-cycle").addEventListener("click", async () => {
   if (!state.version) return;
   try {
     const { status } = await API.post("/api/service/settings/ipset_cycle", { version: state.version });
-    $("ipset-status-badge").textContent = status;
+    syncStateBadge("state-ipset", status);
     logService(t("log_ipset_switched", { status }));
   } catch (e) { toast(e.message, "error"); }
 });
 
 $("check-updates-toggle").addEventListener("change", async (e) => {
   if (!state.version) return;
+  const label = e.target.checked ? t("state_enabled") : t("state_disabled");
   try {
     await API.post("/api/service/settings/check_updates", { version: state.version, enabled: e.target.checked });
-    logService(t("log_check_updates_toggled", { state: e.target.checked ? t("state_enabled") : t("state_disabled") }));
+    syncStateBadge("state-autoupdate", label);
+    logService(t("log_check_updates_toggled", { state: label }));
   } catch (err) { toast(err.message, "error"); }
 });
 
@@ -461,7 +835,7 @@ $("update-ipset").addEventListener("click", async () => {
     const { output } = await API.post("/api/service/update/ipset", { version: state.version });
     logService(output);
     const s = await API.get(`/api/service/settings?version=${encodeURIComponent(state.version)}`);
-    $("ipset-status-badge").textContent = s.ipset;
+    syncStateBadge("state-ipset", s.ipset);
   } catch (e) { logService(t("label_error_prefix", { message: e.message })); }
 });
 
@@ -591,6 +965,7 @@ $("clear-discord-cache").addEventListener("click", async () => {
 (async function init() {
   await loadEnv();
   await loadServiceCatalog();
+  await loadScanSettings();
   await loadVersions();
   await loadStrategiesForAllTabs();
   pollWinwsStatus();

@@ -9,7 +9,9 @@ Must run as Administrator (winws.exe needs the WinDivert driver).
 
 import ctypes
 import json
+import os
 import secrets
+import shutil
 import sys
 import threading
 import webbrowser
@@ -17,8 +19,19 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+# Packaged as a windowed (console=False) exe: there is no console, so
+# sys.stdout/stderr are None. Anything that still calls print() (including
+# in the imported modules below) would otherwise crash with
+# "AttributeError: 'NoneType' object has no attribute 'write'" the first
+# time it runs. Redirect to a null sink instead of hunting down every print.
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w")
+
 import zapret_tester as zt
 import zapret_service as zs
+import zapret_generator as zg
 from i18n import t
 
 def _resource_dir() -> Path:
@@ -109,11 +122,105 @@ class TestSession:
 test_session = TestSession()
 
 
+# --------------------------------------------------------------------------- #
+# background generator session (single run at a time, mirrors TestSession) —
+# also keeps `texts` (candidate name -> generated .bat content) around after
+# a run finishes, since that's what /api/generator/save persists to disk.
+# --------------------------------------------------------------------------- #
+
+class GeneratorSession:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.running = False
+        self.stop_requested = False
+        self.log = []
+        self.progress = {"done": 0, "total": 0}
+        self.results = {}
+        self.best = None
+        self.version = None
+        self.texts = {}
+        self.baseline = None
+        self.inconclusive = False
+
+    def reset(self, version_name, total):
+        with self.lock:
+            self.running = True
+            self.stop_requested = False
+            self.log = []
+            self.progress = {"done": 0, "total": total}
+            self.results = {}
+            self.best = None
+            self.version = version_name
+            self.texts = {}
+            self.baseline = None
+            self.inconclusive = False
+
+    def append_log(self, msg):
+        with self.lock:
+            self.log.append(msg)
+            if msg.startswith("["):
+                self.progress["done"] += 1
+
+    def finish(self, results, best, texts, baseline, inconclusive):
+        with self.lock:
+            self.results = results
+            self.best = best
+            self.texts = texts
+            self.baseline = baseline
+            self.inconclusive = inconclusive
+            self.running = False
+
+    def snapshot(self, since=0):
+        with self.lock:
+            out = {
+                "running": self.running,
+                "log": self.log[since:],
+                "log_len": len(self.log),
+                "progress": dict(self.progress),
+                "version": self.version,
+            }
+            if not self.running and self.results:
+                out["results"] = self.results
+                out["best"] = self.best
+                out["baseline"] = self.baseline
+                out["inconclusive"] = self.inconclusive
+                out["candidates"] = list(self.texts.keys())
+            return out
+
+
+generator_session = GeneratorSession()
+
+
+# --------------------------------------------------------------------------- #
+# version scan cache — name -> absolute Path, populated by _do_rescan().
+# Versions can now live anywhere on disk (global scan) or in a
+# user-configured folder (custom scan), not just under BASE_DIR, so every
+# lookup by name goes through this cache instead of assuming BASE_DIR/name.
+# --------------------------------------------------------------------------- #
+
+_version_paths = {}
+_scan_lock = threading.Lock()
+
+
+def _do_rescan(lang="ru"):
+    settings = zt.load_scan_settings()
+    if settings["mode"] == "custom" and settings.get("custom_dir"):
+        found = zt.find_versions_in_dir(Path(settings["custom_dir"]))
+    else:
+        found = zt.find_versions_global()
+    with _scan_lock:
+        _version_paths.clear()
+        _version_paths.update(found)
+    return sorted(_version_paths.keys(), key=zt.natural_key)
+
+
 def _version_dir(name, lang="ru"):
     if not name:
         raise ValueError(t(lang, "err_version_not_specified"))
-    vd = BASE_DIR / name
-    if not vd.exists() or not (vd / "bin" / "winws.exe").exists():
+    if not _version_paths:
+        _do_rescan(lang)
+    vd = _version_paths.get(name)
+    if not vd or not vd.exists() or not (vd / "bin" / "winws.exe").exists():
         raise ValueError(t(lang, "err_unknown_version", name=name))
     return vd
 
@@ -171,8 +278,17 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             if path == "/api/versions":
-                versions = zt.find_versions(BASE_DIR)
-                return self._send_json({"versions": [v.name for v in versions]})
+                if qs.get("rescan", ["0"])[0] == "1" or not _version_paths:
+                    names = _do_rescan(lang)
+                else:
+                    names = sorted(_version_paths.keys(), key=zt.natural_key)
+                return self._send_json({
+                    "versions": names,
+                    "paths": {name: str(p) for name, p in _version_paths.items()},
+                })
+
+            if path == "/api/scan/settings":
+                return self._send_json(zt.load_scan_settings())
 
             if path == "/api/strategies":
                 vd = _version_dir(qs.get("version", [None])[0], lang)
@@ -186,6 +302,10 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/test/status":
                 since = int(qs.get("since", ["0"])[0])
                 return self._send_json(test_session.snapshot(since))
+
+            if path == "/api/generator/status":
+                since = int(qs.get("since", ["0"])[0])
+                return self._send_json(generator_session.snapshot(since))
 
             if path == "/api/manual/status":
                 return self._send_json({"running": zt.winws_running()})
@@ -289,6 +409,63 @@ class Handler(BaseHTTPRequestHandler):
         test_session.stop_requested = True
         return self._send_json({"ok": True})
 
+    def _generator_start(self, data, lang):
+        if generator_session.running:
+            return self._send_error_json(t(lang, "err_generator_already_running"))
+        if test_session.running:
+            return self._send_error_json(t(lang, "err_test_already_running"))
+        vd = _version_dir(data["version"], lang)
+        mode = data.get("mode")
+        if mode not in ("simple", "advanced"):
+            return self._send_error_json(t(lang, "err_bad_generator_mode"))
+
+        service_names = data.get("services") or []
+        targets = {k: v for k, v in zt.TARGETS.items() if k in service_names} or zt.TARGETS
+        if not targets:
+            return self._send_error_json(t(lang, "err_services_not_found"))
+
+        total = len(zg.SIMPLE_SPACE) if mode == "simple" else len(zg.ADV_METHODS) ** 2 + 12
+        generator_session.reset(vd.name, total)
+
+        def worker():
+            all_results, best_per_service, overall_best, texts, baseline, inconclusive = zg.run_generator(
+                vd, mode, targets=targets, log=generator_session.append_log,
+                should_stop=lambda: generator_session.stop_requested, lang=lang,
+            )
+            best = None
+            if all_results:
+                total_targets = sum(len(v) for v in targets.values())
+                best = {
+                    "per_service": {
+                        svc: {"strategy": name, "score": res[svc]["score"], "total": res[svc]["total"]}
+                        for svc, (name, res) in best_per_service.items()
+                    },
+                    "overall": {
+                        "strategy": overall_best[0],
+                        "score": sum(d["score"] for d in overall_best[1].values()),
+                        "total": total_targets,
+                    } if overall_best else None,
+                }
+            baseline_out = {
+                svc: {"score": d["score"], "total": d["total"]} for svc, d in (baseline or {}).items()
+            } if baseline else None
+            generator_session.finish(all_results, best, texts, baseline_out, inconclusive)
+
+        threading.Thread(target=worker, daemon=True).start()
+        return self._send_json({"ok": True})
+
+    def _generator_stop(self, data, lang):
+        generator_session.stop_requested = True
+        return self._send_json({"ok": True})
+
+    def _generator_save(self, data, lang):
+        vd = _version_dir(data["version"], lang)
+        candidate = data["candidate"]
+        if generator_session.version != vd.name or candidate not in generator_session.texts:
+            raise ValueError(t(lang, "err_generator_candidate_not_found"))
+        out_path = zg.save_candidate(vd, generator_session.texts, candidate, data.get("save_as") or candidate)
+        return self._send_json({"ok": True, "path": str(out_path)})
+
     def _manual_launch(self, data, lang):
         vd = _version_dir(data["version"], lang)
         bat = vd / data["strategy"]
@@ -358,9 +535,38 @@ class Handler(BaseHTTPRequestHandler):
     def _diagnostics_fix_windivert(self, data, lang):
         return self._send_json({"ok": True, "output": zs.fix_windivert_conflict(lang)})
 
+    def _scan_settings_save(self, data, lang):
+        mode = data.get("mode")
+        if mode not in ("global", "custom"):
+            raise ValueError(t(lang, "err_bad_scan_mode"))
+        custom_dir = data.get("custom_dir") or None
+        if mode == "custom" and not custom_dir:
+            raise ValueError(t(lang, "err_no_custom_dir"))
+        zt.save_scan_settings(mode, custom_dir)
+        return self._send_json({"ok": True})
+
+    def _scan_pick_folder(self, data, lang):
+        return self._send_json({"path": zt.pick_folder_dialog()})
+
+    def _open_folder(self, data, lang):
+        vd = _version_dir(data.get("name"), lang)
+        os.startfile(str(vd))
+        return self._send_json({"ok": True})
+
+    def _delete_folder(self, data, lang):
+        name = data.get("name")
+        vd = _version_dir(name, lang)
+        shutil.rmtree(vd)
+        with _scan_lock:
+            _version_paths.pop(name, None)
+        return self._send_json({"ok": True})
+
     _POST_ROUTES = {
         "/api/test/start": _test_start,
         "/api/test/stop": _test_stop,
+        "/api/generator/start": _generator_start,
+        "/api/generator/stop": _generator_stop,
+        "/api/generator/save": _generator_save,
         "/api/manual/launch": _manual_launch,
         "/api/manual/stop": _manual_stop,
         "/api/service/install": _service_install,
@@ -376,6 +582,10 @@ class Handler(BaseHTTPRequestHandler):
         "/api/diagnostics/clear_discord_cache": _diagnostics_clear_discord,
         "/api/diagnostics/stop_services": _diagnostics_stop_services,
         "/api/diagnostics/fix_windivert": _diagnostics_fix_windivert,
+        "/api/scan/settings": _scan_settings_save,
+        "/api/scan/pick_folder": _scan_pick_folder,
+        "/api/open_folder": _open_folder,
+        "/api/delete_folder": _delete_folder,
     }
 
     # -- static files -------------------------------------------------- #
@@ -412,8 +622,8 @@ class Handler(BaseHTTPRequestHandler):
 # --------------------------------------------------------------------------- #
 
 def _relaunch_as_admin():
-    # No web UI (and so no chosen language) exists yet at this point, so
-    # these bootstrap console lines are printed in both languages.
+    # No console exists to print to (windowed build) — the UAC prompt itself
+    # is the only feedback the user gets here, which is expected.
     print("Нужны права администратора, запрашиваю... / Admin rights required, requesting...")
     params = " ".join(f'"{a}"' for a in sys.argv)
     rc = ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, params, str(BASE_DIR), 1)
@@ -430,18 +640,32 @@ def main():
         return
 
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
     url = f"http://127.0.0.1:{PORT}/"
-    print("=" * 60)
-    print(" ZAPRET WEB PANEL")
-    print("=" * 60)
-    print(f"Открываю / Opening: {url}")
-    print("Закройте это окно, чтобы остановить панель. / Close this window to stop the panel.")
 
-    threading.Timer(0.6, lambda: webbrowser.open(url)).start()
+    # Normal path: a real app window (no browser chrome, no console) via
+    # pywebview, wrapping the WebView2 runtime that ships with Windows
+    # 10/11. Falls back to opening the system browser only if that's
+    # unavailable for some reason (e.g. WebView2 runtime missing) — the
+    # panel still works, just as a browser tab instead of a window.
     try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        pass
+        import webview
+        webview.create_window(
+            "Zapret Control Panel", url,
+            width=520, height=840, min_size=(440, 680),
+            background_color="#05070a",
+        )
+        webview.start()
+    except Exception:
+        webbrowser.open(url)
+        try:
+            server_thread.join()
+        except KeyboardInterrupt:
+            pass
+        return
+
+    server.shutdown()
 
 
 if __name__ == "__main__":

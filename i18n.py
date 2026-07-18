@@ -144,6 +144,33 @@ MESSAGES = {
     "err_version_not_specified": {"ru": "Версия не указана", "en": "Version not specified"},
     "err_unknown_version": {"ru": "Неизвестная версия: {name}", "en": "Unknown version: {name}"},
     "err_strategy_not_found": {"ru": "Стратегия не найдена: {strategy}", "en": "Strategy not found: {strategy}"},
+    "err_bad_scan_mode": {"ru": "Неизвестный режим поиска версий", "en": "Unknown version scan mode"},
+    "err_no_custom_dir": {"ru": "Папка не выбрана", "en": "No folder chosen"},
+    "err_generator_already_running": {"ru": "Подбор стратегии уже выполняется", "en": "A generator run is already in progress"},
+    "err_bad_generator_mode": {"ru": "Неизвестный режим подбора стратегии", "en": "Unknown generator mode"},
+    "err_generator_candidate_not_found": {
+        "ru": "Вариант не найден — запустите подбор заново",
+        "en": "Candidate not found — run the generator again",
+    },
+
+    # -- zapret_generator: log lines reaching the web UI ------------------------- #
+    "gen_baseline_start": {
+        "ru": "Замеряю доступность без обхода (baseline)...",
+        "en": "Measuring connectivity with no bypass running (baseline)...",
+    },
+    "gen_stage1": {"ru": "Этап 1: пробую {count} комбинаций методов...", "en": "Stage 1: trying {count} method combinations..."},
+    "gen_stage2": {
+        "ru": "Этап 2: уточняю параметры вокруг лучших ({winners}), ещё {count} вариантов...",
+        "en": "Stage 2: refining parameters around the best result(s) ({winners}), {count} more candidates...",
+    },
+    "gen_inconclusive_warning": {
+        "ru": "Ни один вариант не показал результат лучше, чем совсем без обхода — "
+              "возможно, выбранные сайты у вас и так не заблокированы, либо нужно "
+              "подбирать вручную.",
+        "en": "No candidate scored better than running with no bypass at all — the "
+              "selected sites may not actually be blocked for you, or this needs "
+              "manual tuning.",
+    },
 
     # -- zapret_tester: log lines reaching the web UI --------------------------- #
     "stopped_by_user": {"ru": "Остановлено пользователем.", "en": "Stopped by user."},

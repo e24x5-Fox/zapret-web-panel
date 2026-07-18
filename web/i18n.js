@@ -13,6 +13,18 @@ const I18N = {
     checking: "проверка...",
     checking_dots: "Проверка...",
 
+    // home screen (VPN-style connect circle)
+    btn_open_settings: "Настройки",
+    btn_open_settings_hint: "Подключиться или отключиться",
+    home_status_connected: "ПОДКЛЮЧЕНО",
+    home_status_disconnected: "ОТКЛЮЧЕНО",
+    home_sub_connected: "Работает стратегия «{strategy}» — нажмите, чтобы остановить",
+    home_sub_disconnected: "Нажмите, чтобы запустить «{strategy}»",
+    home_sub_no_strategy: "Выберите стратегию ниже",
+    home_version_label: "Версия: {version}",
+    home_admin_warning: "Панель запущена без прав администратора — обход работать не будет.",
+    settings_header: "Настройки",
+
     test_title: "Тест стратегий",
     test_desc: "Прогоняет выбранные стратегии по выбранным сервисам и показывает, какая реально пробивает блокировку.",
     strategies_title: "Стратегии",
@@ -110,6 +122,57 @@ const I18N = {
     err_nothing_selected: "Ничего не выбрано",
     confirm_stop_services_title: "Остановить службы?",
     confirm_stop_services_msg: "Будут остановлены:\n{names}",
+
+    // console-menu screen
+    menu_cat_service: "SERVICE",
+    menu_cat_settings: "SETTINGS",
+    menu_cat_updates: "UPDATES",
+    menu_cat_tools: "TOOLS",
+    menu_install_service: "Установить службу",
+    menu_remove_services: "Удалить службы",
+    menu_check_status: "Проверить статус",
+    menu_manual_launch: "Ручной запуск стратегии",
+    menu_game_filter: "Игровой фильтр",
+    menu_ipset_filter: "Список IP (ipset)",
+    menu_autoupdate: "Автопроверка обновлений",
+    menu_update_ipset: "Обновить список IPSet",
+    menu_update_hosts: "Обновить hosts-файл",
+    menu_check_updates: "Проверить обновления",
+    menu_run_diagnostics: "Запустить диагностику",
+    menu_run_tests: "Запустить тест",
+    err_no_versions_found: "Не найдено ни одной версии zapret ни рядом с панелью, ни на дисках компьютера",
+    msg_scanning: "Сканирование дисков...",
+    label_scan_mode: "Поиск версий",
+    scan_mode_global: "Всё устройство",
+    scan_mode_custom: "Конкретная папка",
+    btn_show_paths: "[показать пути]",
+    btn_hide_paths: "[скрыть пути]",
+    btn_pick_folder: "[выбрать...]",
+    btn_picking_folder: "[открываю диалог...]",
+    label_no_custom_dir: "папка не выбрана",
+    btn_open_folder: "открыть папку",
+    found_paths_empty: "Ничего не найдено.",
+    msg_scan_settings_saved: "Настройка поиска сохранена, список версий обновлён",
+    btn_delete_folder: "удалить",
+    confirm_delete_folder_title: "Удалить папку?",
+    confirm_delete_folder_msg: "Папка будет удалена безвозвратно:\n{path}\n\nЭто действие нельзя отменить.",
+    msg_folder_deleted: "Папка удалена",
+
+    // generator (strategy auto-generation) screen
+    menu_run_generator: "Подобрать стратегию",
+    generator_desc: "Если ни одна готовая стратегия не пробивает блокировку — перебирает комбинации методов dpi-desync и тестирует каждую, как в «Тест». Рабочий вариант можно сохранить как обычную стратегию.",
+    label_generator_mode: "Режим",
+    generator_mode_simple: "Простой",
+    generator_mode_advanced: "Продвинутый",
+    generator_mode_simple_hint: "Простой: 5 вариантов, быстро. Хорошо для первой попытки.",
+    generator_mode_advanced_hint: "Продвинутый: до ~37 вариантов (для hostlist- и ipset-фильтров методы подбираются отдельно), дольше, но точнее.",
+    btn_run_generator: "Подобрать стратегию",
+    btn_save_strategy: "Сохранить как стратегию",
+    msg_saving: "Сохранение...",
+    msg_strategy_saved: "Стратегия сохранена: {path}",
+    label_baseline: "Без обхода (baseline)",
+    confirm_run_generator_title: "Запустить подбор стратегии?",
+    confirm_run_generator_msg: "Будет перебран набор комбинаций методов dpi-desync и протестирован по сервисам: {services}.\nЭто может занять продолжительное время.",
   },
 
   en: {
@@ -123,6 +186,18 @@ const I18N = {
     nav_diagnostics: "Diagnostics",
     checking: "checking...",
     checking_dots: "Checking...",
+
+    // home screen (VPN-style connect circle)
+    btn_open_settings: "Settings",
+    btn_open_settings_hint: "Connect or disconnect",
+    home_status_connected: "CONNECTED",
+    home_status_disconnected: "DISCONNECTED",
+    home_sub_connected: "“{strategy}” is running — click to stop",
+    home_sub_disconnected: "Click to launch “{strategy}”",
+    home_sub_no_strategy: "Choose a strategy below",
+    home_version_label: "Version: {version}",
+    home_admin_warning: "The panel is running without administrator rights — the bypass won't work.",
+    settings_header: "Settings",
 
     test_title: "Strategy test",
     test_desc: "Runs the selected strategies against the selected services and shows which one actually gets through.",
@@ -221,6 +296,57 @@ const I18N = {
     err_nothing_selected: "Nothing selected",
     confirm_stop_services_title: "Stop these services?",
     confirm_stop_services_msg: "These will be stopped:\n{names}",
+
+    // console-menu screen
+    menu_cat_service: "SERVICE",
+    menu_cat_settings: "SETTINGS",
+    menu_cat_updates: "UPDATES",
+    menu_cat_tools: "TOOLS",
+    menu_install_service: "Install Service",
+    menu_remove_services: "Remove Services",
+    menu_check_status: "Check Status",
+    menu_manual_launch: "Manual strategy launch",
+    menu_game_filter: "Game Filter",
+    menu_ipset_filter: "IPSet Filter",
+    menu_autoupdate: "Auto-Update Check",
+    menu_update_ipset: "Update IPSet List",
+    menu_update_hosts: "Update Hosts File",
+    menu_check_updates: "Check for Updates",
+    menu_run_diagnostics: "Run Diagnostics",
+    menu_run_tests: "Run Tests",
+    err_no_versions_found: "No zapret version folders found next to the panel or anywhere on the machine's drives",
+    msg_scanning: "Scanning drives...",
+    label_scan_mode: "Version scan",
+    scan_mode_global: "Whole computer",
+    scan_mode_custom: "Specific folder",
+    btn_show_paths: "[show paths]",
+    btn_hide_paths: "[hide paths]",
+    btn_pick_folder: "[choose...]",
+    btn_picking_folder: "[opening dialog...]",
+    label_no_custom_dir: "no folder chosen",
+    btn_open_folder: "open folder",
+    found_paths_empty: "Nothing found.",
+    msg_scan_settings_saved: "Scan setting saved, version list refreshed",
+    btn_delete_folder: "delete",
+    confirm_delete_folder_title: "Delete this folder?",
+    confirm_delete_folder_msg: "This folder will be permanently deleted:\n{path}\n\nThis cannot be undone.",
+    msg_folder_deleted: "Folder deleted",
+
+    // generator (strategy auto-generation) screen
+    menu_run_generator: "Generate a strategy",
+    generator_desc: "If none of the built-in strategies get through — this tries combinations of dpi-desync methods and tests each one, just like \"Test\". A working candidate can be saved as a regular strategy.",
+    label_generator_mode: "Mode",
+    generator_mode_simple: "Simple",
+    generator_mode_advanced: "Advanced",
+    generator_mode_simple_hint: "Simple: 5 candidates, fast. Good for a first attempt.",
+    generator_mode_advanced_hint: "Advanced: up to ~37 candidates (hostlist- and ipset-based filters get separate methods), slower but more precise.",
+    btn_run_generator: "Generate a strategy",
+    btn_save_strategy: "Save as strategy",
+    msg_saving: "Saving...",
+    msg_strategy_saved: "Strategy saved: {path}",
+    label_baseline: "No bypass (baseline)",
+    confirm_run_generator_title: "Run the strategy generator?",
+    confirm_run_generator_msg: "This will try a set of dpi-desync method combinations and test each against: {services}.\nThis can take a while.",
   },
 };
 
@@ -244,6 +370,9 @@ function getLang() {
 function applyStaticTranslations() {
   document.querySelectorAll("[data-i18n]").forEach((el) => {
     el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll("[data-i18n-aria]").forEach((el) => {
+    el.setAttribute("aria-label", t(el.dataset.i18nAria));
   });
   document.title = t("page_title");
   document.documentElement.lang = currentLang;

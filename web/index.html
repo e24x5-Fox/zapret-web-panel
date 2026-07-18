@@ -8,192 +8,262 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="app">
+<div class="app-shell">
 
-  <aside class="sidebar">
-    <div class="brand">
-      <div class="brand-mark">⚡</div>
-      <div class="brand-text">
-        <div class="brand-title">Zapret</div>
-        <div class="brand-sub" data-i18n="brand_sub">Control Panel</div>
-      </div>
+  <div class="topbar">
+    <div class="brand"><span class="brand-dot"></span>Zapret</div>
+    <div class="topbar-actions">
       <div class="lang-switch" id="lang-switch">
         <button class="lang-btn" data-lang="ru">RU</button>
         <button class="lang-btn" data-lang="en">EN</button>
       </div>
+      <button id="open-settings" class="icon-btn" type="button" data-i18n-aria="btn_open_settings" aria-label="Настройки">⚙</button>
+    </div>
+  </div>
+
+  <div class="view view-home active visible" id="view-home">
+    <div class="home-card">
+      <button id="connect-circle" class="connect-circle" type="button" data-i18n-aria="btn_open_settings_hint" aria-label="Подключиться / отключиться">
+        <span class="connect-icon">⏻</span>
+      </button>
+      <div class="connect-status" id="connect-status" data-i18n="home_status_disconnected">ОТКЛЮЧЕНО</div>
+      <div class="connect-sub" id="connect-sub" data-i18n="home_sub_no_strategy">Выберите стратегию ниже</div>
+
+      <div class="home-field">
+        <label for="hero-strategy-select" data-i18n="field_strategy">Стратегия</label>
+        <select id="hero-strategy-select"></select>
+      </div>
+
+      <div class="home-meta">
+        <span id="home-version-label"></span>
+      </div>
+
+      <div id="home-admin-warning" class="home-warning" style="display:none" data-i18n="home_admin_warning">
+        Панель запущена без прав администратора — обход работать не будет.
+      </div>
+    </div>
+  </div>
+
+  <div class="view view-settings" id="view-settings">
+    <div class="settings-header">
+      <button id="close-settings" class="icon-btn" type="button" aria-label="Назад">←</button>
+      <h2 data-i18n="settings_header">Настройки</h2>
     </div>
 
-    <div class="field">
-      <label data-i18n="field_version">Версия</label>
-      <select id="version-select"></select>
-    </div>
-    <button id="reload-versions" class="btn btn-ghost btn-small btn-block" data-i18n="btn_reload_versions">Обновить список версий</button>
+    <div class="settings-body">
+      <div class="meta">
+        <div class="meta-line">
+          <span class="meta-prompt">#</span>
+          <label for="version-select" data-i18n="field_version">Версия</label>:
+          <select id="version-select" class="term-select"></select>
+          <button id="reload-versions" class="term-link" data-i18n="btn_reload_versions">Обновить список версий</button>
+        </div>
+        <div class="meta-line"><span id="admin-dot" class="dot"></span><span id="admin-text" data-i18n="checking">проверка...</span></div>
+        <div class="meta-line"><span id="winws-dot" class="dot"></span><span id="winws-text">winws: ...</span></div>
 
-    <nav class="nav">
-      <button class="nav-item active" data-tab="test"><span class="nav-icon">🧪</span><span data-i18n="nav_test">Тест</span></button>
-      <button class="nav-item" data-tab="manual"><span class="nav-icon">▶</span><span data-i18n="nav_manual">Ручной запуск</span></button>
-      <button class="nav-item" data-tab="service"><span class="nav-icon">⚙</span><span data-i18n="nav_service">Служба</span></button>
-      <button class="nav-item" data-tab="diagnostics"><span class="nav-icon">🩺</span><span data-i18n="nav_diagnostics">Диагностика</span></button>
-    </nav>
-
-    <div class="sidebar-footer">
-      <div class="status-row"><span id="admin-dot" class="dot"></span><span id="admin-text" data-i18n="checking">проверка...</span></div>
-      <div class="status-row"><span id="winws-dot" class="dot"></span><span id="winws-text">winws: ...</span></div>
-    </div>
-  </aside>
-
-  <main class="content">
-
-    <section id="tab-test" class="tab active">
-      <div class="tab-header">
-        <h1 data-i18n="test_title">Тест стратегий</h1>
-        <p class="muted" data-i18n="test_desc">Прогоняет выбранные стратегии по выбранным сервисам и показывает, какая реально пробивает блокировку.</p>
+        <div class="meta-line">
+          <span class="meta-prompt">#</span>
+          <span data-i18n="label_scan_mode">Поиск версий</span>:
+          <div class="segmented" id="scan-mode-segmented">
+            <button data-value="global" data-i18n="scan_mode_global">Всё устройство</button>
+            <button data-value="custom" data-i18n="scan_mode_custom">Конкретная папка</button>
+          </div>
+          <button id="toggle-found-paths" class="term-link" data-i18n="btn_show_paths">[показать пути]</button>
+        </div>
+        <div class="meta-line" id="scan-custom-row" style="display:none">
+          <span class="meta-prompt">&gt;</span>
+          <span id="scan-custom-dir-text" data-i18n="label_no_custom_dir">папка не выбрана</span>
+          <button id="scan-pick-folder" class="term-link" data-i18n="btn_pick_folder">[выбрать...]</button>
+        </div>
+        <div class="found-paths" id="found-paths"></div>
       </div>
 
-      <div class="grid-test">
-        <div class="left-col">
-          <div class="card strategies-card">
-            <div class="card-header">
-              <h3 data-i18n="strategies_title">Стратегии</h3>
-              <div class="card-actions">
-                <button id="select-all" class="btn btn-ghost btn-small" data-i18n="select_all">Все</button>
-                <button id="select-none" class="btn btn-ghost btn-small" data-i18n="select_none">Ничего</button>
-              </div>
+      <div class="menu" id="menu">
+
+        <div class="menu-cat" data-i18n="menu_cat_service">SERVICE</div>
+
+        <div class="menu-item" data-target="panel-install">
+          <span class="menu-num">1.</span><span class="menu-label" data-i18n="menu_install_service">Установить службу</span>
+        </div>
+        <div class="menu-panel" id="panel-install"><div class="menu-panel-inner">
+          <div class="field-row">
+            <div class="field grow">
+              <label data-i18n="field_install_strategy">Стратегия для установки</label>
+              <select id="service-strategy"></select>
             </div>
-            <div id="strategy-list" class="strategy-list"></div>
+            <button id="service-install" class="btn btn-primary" data-i18n="btn_service_install">Установить как службу</button>
           </div>
+        </div></div>
 
-          <div class="card services-card">
-            <div class="card-header">
-              <h3 data-i18n="services_title">Сервисы</h3>
-              <div class="card-actions">
-                <button id="services-select-all" class="btn btn-ghost btn-small" data-i18n="select_all">Все</button>
-                <button id="services-select-none" class="btn btn-ghost btn-small" data-i18n="select_none">Ничего</button>
-              </div>
-            </div>
-            <div id="service-list" class="strategy-list"></div>
-          </div>
+        <div class="menu-item" id="service-remove">
+          <span class="menu-num">2.</span><span class="menu-label" data-i18n="menu_remove_services">Удалить службы</span>
         </div>
 
-        <div class="card main-card">
-          <div class="card-header">
-            <h3 data-i18n="test_progress_title">Ход теста</h3>
-            <div class="progress-wrap">
-              <div class="progress-bar"><div id="test-progress-fill" class="progress-fill"></div></div>
-              <span id="test-progress-text" class="progress-text">0/0</span>
-            </div>
-          </div>
-          <div class="btn-row">
-            <button id="run-test" class="btn btn-primary" data-i18n="btn_run_test">Запустить тест</button>
-            <button id="stop-test" class="btn btn-danger" disabled data-i18n="btn_stop">Остановить</button>
-          </div>
-          <pre id="test-log" class="console"></pre>
-          <div id="test-summary" class="summary-list"></div>
+        <div class="menu-item" id="service-status">
+          <span class="menu-num">3.</span><span class="menu-label" data-i18n="menu_check_status">Проверить статус</span>
         </div>
-      </div>
-    </section>
 
-    <section id="tab-manual" class="tab">
-      <div class="tab-header">
-        <h1 data-i18n="manual_title">Ручной запуск</h1>
-        <p class="muted" data-i18n="manual_desc">Запустите любую стратегию из выбранной версии напрямую, без теста.</p>
-      </div>
-      <div class="card">
-        <div class="field-row">
-          <div class="field grow">
-            <label data-i18n="field_strategy">Стратегия</label>
-            <select id="manual-strategy"></select>
-          </div>
-          <button id="manual-launch" class="btn btn-primary" data-i18n="btn_launch">Запустить</button>
-          <button id="manual-stop" class="btn btn-danger" data-i18n="btn_stop">Остановить</button>
-        </div>
-        <div class="status-banner">
-          <span id="manual-dot" class="dot"></span>
-          <span id="manual-status-text" data-i18n="checking_dots">Проверка...</span>
-        </div>
-      </div>
-    </section>
+        <div class="menu-cat" data-i18n="menu_cat_settings">SETTINGS</div>
 
-    <section id="tab-service" class="tab">
-      <div class="tab-header">
-        <h1 data-i18n="service_title">Служба</h1>
-        <p class="muted" data-i18n="service_desc">Полный функционал service.bat — install/remove, настройки, обновления. Без консоли.</p>
-      </div>
-
-      <div class="card">
-        <h3 data-i18n="autostart_title">Автозапуск</h3>
-        <div class="field-row">
-          <div class="field grow">
-            <label data-i18n="field_install_strategy">Стратегия для установки</label>
-            <select id="service-strategy"></select>
-          </div>
+        <div class="menu-item" data-target="panel-gamefilter">
+          <span class="menu-num">4.</span><span class="menu-label" data-i18n="menu_game_filter">Игровой фильтр</span>
+          <span class="menu-state" id="state-gamefilter">[...]</span>
         </div>
-        <div class="btn-row">
-          <button id="service-install" class="btn btn-primary" data-i18n="btn_service_install">Установить как службу</button>
-          <button id="service-remove" class="btn btn-danger" data-i18n="btn_service_remove">Удалить службу</button>
-          <button id="service-status" class="btn btn-ghost" data-i18n="btn_status">Статус</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3 data-i18n="settings_title">Настройки</h3>
-        <div class="setting-row">
-          <label data-i18n="label_game_filter">Игровой фильтр</label>
+        <div class="menu-panel" id="panel-gamefilter"><div class="menu-panel-inner">
           <div class="segmented" id="game-filter-segmented">
             <button data-value="disabled" data-i18n="gf_disabled">Выкл</button>
             <button data-value="all">TCP+UDP</button>
             <button data-value="tcp">TCP</button>
             <button data-value="udp">UDP</button>
           </div>
+        </div></div>
+
+        <div class="menu-item" data-target="panel-ipset">
+          <span class="menu-num">5.</span><span class="menu-label" data-i18n="menu_ipset_filter">Список IP (ipset)</span>
+          <span class="menu-state" id="state-ipset">[...]</span>
         </div>
-        <div class="setting-row">
-          <label data-i18n="label_ipset">Список IP (ipset)</label>
-          <div class="ipset-control">
-            <span id="ipset-status-badge" class="badge">...</span>
-            <button id="ipset-cycle" class="btn btn-ghost btn-small" data-i18n="btn_switch">Переключить</button>
-          </div>
+        <div class="menu-panel" id="panel-ipset"><div class="menu-panel-inner">
+          <button id="ipset-cycle" class="btn btn-ghost" data-i18n="btn_switch">Переключить</button>
+        </div></div>
+
+        <div class="menu-item" data-target="panel-autoupdate">
+          <span class="menu-num">6.</span><span class="menu-label" data-i18n="menu_autoupdate">Автопроверка обновлений</span>
+          <span class="menu-state" id="state-autoupdate">[...]</span>
         </div>
-        <div class="setting-row">
-          <label data-i18n="label_check_updates">Автопроверка обновлений zapret</label>
+        <div class="menu-panel" id="panel-autoupdate"><div class="menu-panel-inner">
           <label class="switch">
             <input type="checkbox" id="check-updates-toggle">
             <span class="slider"></span>
           </label>
+        </div></div>
+
+        <div class="menu-cat" data-i18n="menu_cat_updates">UPDATES</div>
+
+        <div class="menu-item" id="update-ipset">
+          <span class="menu-num">7.</span><span class="menu-label" data-i18n="menu_update_ipset">Обновить список IPSet</span>
         </div>
+
+        <div class="menu-item" id="update-hosts">
+          <span class="menu-num">8.</span><span class="menu-label" data-i18n="menu_update_hosts">Обновить hosts-файл</span>
+        </div>
+
+        <div class="menu-item" id="check-updates-btn">
+          <span class="menu-num">9.</span><span class="menu-label" data-i18n="menu_check_updates">Проверить обновления</span>
+        </div>
+
+        <div class="menu-cat" data-i18n="menu_cat_tools">TOOLS</div>
+
+        <div class="menu-item" data-target="panel-diagnostics">
+          <span class="menu-num">10.</span><span class="menu-label" data-i18n="menu_run_diagnostics">Запустить диагностику</span>
+        </div>
+        <div class="menu-panel" id="panel-diagnostics"><div class="menu-panel-inner">
+          <p class="muted" data-i18n="diagnostics_desc">Проверки конфликтов и здоровья системы — как в service.bat → Run Diagnostics.</p>
+          <div class="btn-row">
+            <button id="run-diagnostics" class="btn btn-primary" data-i18n="btn_run_diagnostics">Запустить диагностику</button>
+            <button id="remove-conflicts" class="btn btn-danger" disabled data-i18n="btn_remove_conflicts">Удалить конфликтующие службы</button>
+            <button id="fix-windivert" class="btn btn-danger" disabled data-i18n="btn_fix_windivert">Исправить конфликт WinDivert</button>
+            <button id="clear-discord-cache" class="btn btn-ghost" data-i18n="btn_clear_discord_cache">Очистить кэш Discord</button>
+          </div>
+          <div id="diagnostics-results" class="diagnostics-list"></div>
+        </div></div>
+
+        <div class="menu-item" data-target="panel-tests">
+          <span class="menu-num">11.</span><span class="menu-label" data-i18n="menu_run_tests">Запустить тест</span>
+        </div>
+        <div class="menu-panel" id="panel-tests"><div class="menu-panel-inner">
+          <p class="muted" data-i18n="test_desc">Прогоняет выбранные стратегии по выбранным сервисам и показывает, какая реально пробивает блокировку.</p>
+          <div class="grid-test">
+            <div class="left-col">
+              <div class="card strategies-card">
+                <div class="card-header">
+                  <h3 data-i18n="strategies_title">Стратегии</h3>
+                  <div class="card-actions">
+                    <button id="select-all" class="btn btn-ghost btn-small" data-i18n="select_all">Все</button>
+                    <button id="select-none" class="btn btn-ghost btn-small" data-i18n="select_none">Ничего</button>
+                  </div>
+                </div>
+                <div id="strategy-list" class="strategy-list"></div>
+              </div>
+
+              <div class="card services-card">
+                <div class="card-header">
+                  <h3 data-i18n="services_title">Сервисы</h3>
+                  <div class="card-actions">
+                    <button id="services-select-all" class="btn btn-ghost btn-small" data-i18n="select_all">Все</button>
+                    <button id="services-select-none" class="btn btn-ghost btn-small" data-i18n="select_none">Ничего</button>
+                  </div>
+                </div>
+                <div id="service-list" class="strategy-list"></div>
+              </div>
+            </div>
+
+            <div class="card main-card">
+              <div class="card-header">
+                <h3 data-i18n="test_progress_title">Ход теста</h3>
+                <div class="progress-wrap">
+                  <div class="progress-bar"><div id="test-progress-fill" class="progress-fill"></div></div>
+                  <span id="test-progress-text" class="progress-text">0/0</span>
+                </div>
+              </div>
+              <div class="btn-row">
+                <button id="run-test" class="btn btn-primary" data-i18n="btn_run_test">Запустить тест</button>
+                <button id="stop-test" class="btn btn-danger" disabled data-i18n="btn_stop">Остановить</button>
+              </div>
+              <pre id="test-log" class="console"></pre>
+              <div id="test-summary" class="summary-list"></div>
+            </div>
+          </div>
+        </div></div>
+
+        <div class="menu-item" data-target="panel-generator">
+          <span class="menu-num">12.</span><span class="menu-label" data-i18n="menu_run_generator">Подобрать стратегию</span>
+        </div>
+        <div class="menu-panel" id="panel-generator"><div class="menu-panel-inner">
+          <p class="muted" data-i18n="generator_desc">Если ни одна готовая стратегия не пробивает блокировку — перебирает комбинации методов dpi-desync и тестирует каждую, как в "Тест". Рабочий вариант можно сохранить как обычную стратегию.</p>
+
+          <div class="field-row">
+            <div class="field">
+              <label data-i18n="label_generator_mode">Режим</label>
+              <div class="segmented" id="generator-mode-segmented">
+                <button data-value="simple" class="active" data-i18n="generator_mode_simple">Простой</button>
+                <button data-value="advanced" data-i18n="generator_mode_advanced">Продвинутый</button>
+              </div>
+            </div>
+          </div>
+          <p class="muted small" id="generator-mode-hint" data-i18n="generator_mode_simple_hint">Простой: 5 вариантов, быстро. Хорошо для первой попытки.</p>
+
+          <div class="card services-card">
+            <div class="card-header">
+              <h3 data-i18n="services_title">Сервисы</h3>
+              <div class="card-actions">
+                <button id="generator-services-select-all" class="btn btn-ghost btn-small" data-i18n="select_all">Все</button>
+                <button id="generator-services-select-none" class="btn btn-ghost btn-small" data-i18n="select_none">Ничего</button>
+              </div>
+            </div>
+            <div id="generator-service-list" class="strategy-list"></div>
+          </div>
+
+          <div class="progress-wrap">
+            <div class="progress-bar"><div id="generator-progress-fill" class="progress-fill"></div></div>
+            <span id="generator-progress-text" class="progress-text">0/0</span>
+          </div>
+          <div class="btn-row">
+            <button id="run-generator" class="btn btn-primary" data-i18n="btn_run_generator">Подобрать стратегию</button>
+            <button id="stop-generator" class="btn btn-danger" disabled data-i18n="btn_stop">Остановить</button>
+          </div>
+          <pre id="generator-log" class="console"></pre>
+          <div id="generator-summary" class="summary-list"></div>
+        </div></div>
+
       </div>
 
-      <div class="card">
-        <h3 data-i18n="updates_title">Обновления</h3>
-        <div class="btn-row">
-          <button id="update-ipset" class="btn btn-ghost" data-i18n="btn_update_ipset">Обновить список IPSet</button>
-          <button id="update-hosts" class="btn btn-ghost" data-i18n="btn_update_hosts">Проверить/обновить hosts</button>
-          <button id="check-updates-btn" class="btn btn-ghost" data-i18n="btn_check_updates">Проверить обновления zapret</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3 data-i18n="output_title">Вывод</h3>
+      <div class="console-wrap">
+        <div class="console-label"># <span data-i18n="output_title">Вывод</span></div>
         <pre id="service-output" class="console"></pre>
       </div>
-    </section>
+    </div>
+  </div>
 
-    <section id="tab-diagnostics" class="tab">
-      <div class="tab-header">
-        <h1 data-i18n="diagnostics_title">Диагностика</h1>
-        <p class="muted" data-i18n="diagnostics_desc">Проверки конфликтов и здоровья системы — как в service.bat → Run Diagnostics.</p>
-      </div>
-      <div class="card">
-        <div class="btn-row">
-          <button id="run-diagnostics" class="btn btn-primary" data-i18n="btn_run_diagnostics">Запустить диагностику</button>
-          <button id="remove-conflicts" class="btn btn-danger" disabled data-i18n="btn_remove_conflicts">Удалить конфликтующие службы</button>
-          <button id="fix-windivert" class="btn btn-danger" disabled data-i18n="btn_fix_windivert">Исправить конфликт WinDivert</button>
-          <button id="clear-discord-cache" class="btn btn-ghost" data-i18n="btn_clear_discord_cache">Очистить кэш Discord</button>
-        </div>
-        <div id="diagnostics-results" class="diagnostics-list"></div>
-      </div>
-    </section>
-
-  </main>
 </div>
 
 <div id="toast-container"></div>

@@ -1,6 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 
+# Windows-only app (see README): pywebview only ever needs its edgechromium
+# (WebView2) backend here, with mshtml as pywebview's own built-in fallback.
+# Excluding the other GUI toolkits it *could* use on other platforms keeps
+# the build from accidentally dragging in something huge like PyQt5/GTK just
+# because it happens to be installed in the build machine's environment.
 a = Analysis(
     ['zapret_web.py'],
     pathex=[],
@@ -10,7 +15,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['PyQt5', 'PyQt6', 'PySide2', 'PySide6', 'gi', 'AppKit', 'Cocoa', 'objc'],
     noarchive=False,
     optimize=0,
 )
@@ -29,7 +34,7 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

@@ -14,6 +14,7 @@ import json
 import os
 import re
 import socket
+import string
 import subprocess
 import sys
 import time
@@ -193,6 +194,15 @@ def find_versions(base_dir: Path):
     return versions
 
 
+def find_versions_in_dir(base_dir: Path) -> dict:
+    """name -> Path map for a single non-recursive folder (same rule as
+    find_versions), tolerant of a folder that doesn't exist (e.g. a
+    custom scan dir that got moved/deleted after being configured)."""
+    if not base_dir.exists() or not base_dir.is_dir():
+        return {}
+    return {entry.name: entry for entry in find_versions(base_dir)}
+
+
 def find_strategies(version_dir: Path):
     bats = [
         f for f in version_dir.glob("*.bat")
@@ -200,6 +210,118 @@ def find_strategies(version_dir: Path):
     ]
     bats.sort(key=lambda p: natural_key(p.name))
     return bats
+
+
+# --------------------------------------------------------------------------- #
+# Whole-computer version scan ("global" scan mode) + persisted scan settings
+# --------------------------------------------------------------------------- #
+
+SCAN_SETTINGS_FILE = _APP_DIR / "scan_settings.json"
+
+# Directories a scan should never descend into: OS/system folders (huge,
+# permission-heavy, never contain a user's zapret release) and common
+# dev-tooling folders (huge, irrelevant, slow to walk).
+_SKIP_SCAN_DIR_NAMES = {
+    "windows", "windows.old", "programdata", "system volume information",
+    "$recycle.bin", "recovery", "msocache", "perflogs", "node_modules",
+    ".git", "$windows.~bt", "$windows.~ws", "program files",
+    "program files (x86)", "appdata",
+}
+# How many directory levels below a drive root a scan will walk. Bounds
+# worst-case scan time; a real release folder sitting deeper than this
+# (e.g. behind many nested "backup of backup" folders) won't be found by
+# the global scan — the user can still point at it with "specific folder".
+_MAX_SCAN_DEPTH = 6
+
+DRIVE_FIXED = 3
+
+
+def list_fixed_drives():
+    """Local hard-disk drive letters (skips CD-ROM/removable/network/unmapped
+    drives, which are either irrelevant or too slow/risky to walk)."""
+    drives = []
+    for letter in string.ascii_uppercase:
+        root = f"{letter}:\\"
+        if not os.path.exists(root):
+            continue
+        try:
+            if ctypes.windll.kernel32.GetDriveTypeW(root) != DRIVE_FIXED:
+                continue
+        except Exception:
+            continue
+        drives.append(Path(root))
+    return drives
+
+
+def _scan_dir_for_versions(directory: Path, found: dict, depth: int = 0):
+    if depth > _MAX_SCAN_DEPTH:
+        return
+    try:
+        entries = list(os.scandir(directory))
+    except OSError:
+        return
+    for entry in entries:
+        try:
+            if not entry.is_dir(follow_symlinks=False):
+                continue
+        except OSError:
+            continue
+        name_lower = entry.name.lower()
+        if name_lower.startswith("$") or name_lower in _SKIP_SCAN_DIR_NAMES:
+            continue
+        path = Path(entry.path)
+        if "zapret" in name_lower and (path / "bin" / "winws.exe").exists():
+            found.setdefault(entry.name, path)
+            continue  # a matched release folder's own contents aren't candidates
+        _scan_dir_for_versions(path, found, depth + 1)
+
+
+def find_versions_global() -> dict:
+    """Best-effort whole-computer scan: this app's own folder (always, and
+    with priority on name clashes, regardless of depth) plus every fixed
+    drive, looking for a directory whose name contains "zapret" and holds
+    bin/winws.exe."""
+    found = {entry.name: entry for entry in find_versions(BASE_DIR)}
+    for drive in list_fixed_drives():
+        _scan_dir_for_versions(drive, found)
+    return found
+
+
+def load_scan_settings() -> dict:
+    if SCAN_SETTINGS_FILE.exists():
+        try:
+            data = json.loads(SCAN_SETTINGS_FILE.read_text(encoding="utf-8"))
+            mode = data.get("mode") if data.get("mode") in ("global", "custom") else "global"
+            return {"mode": mode, "custom_dir": data.get("custom_dir")}
+        except Exception:
+            pass
+    return {"mode": "global", "custom_dir": None}
+
+
+def save_scan_settings(mode: str, custom_dir):
+    SCAN_SETTINGS_FILE.write_text(
+        json.dumps({"mode": mode, "custom_dir": custom_dir}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def pick_folder_dialog():
+    """Blocking native folder-picker dialog. Shelled out to PowerShell/WinForms
+    (-Sta is required for a WinForms dialog to work) instead of bundling a
+    GUI toolkit like tkinter into the frozen exe just for this."""
+    ps_cmd = (
+        "Add-Type -AssemblyName System.Windows.Forms | Out-Null; "
+        "$f = New-Object System.Windows.Forms.FolderBrowserDialog; "
+        "if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $f.SelectedPath }"
+    )
+    try:
+        res = subprocess.run(
+            ["powershell", "-NoProfile", "-Sta", "-Command", ps_cmd],
+            capture_output=True, timeout=300, text=True,
+        )
+        return res.stdout.strip() or None
+    except Exception:
+        return None
 
 
 # --------------------------------------------------------------------------- #

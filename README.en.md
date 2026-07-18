@@ -6,7 +6,7 @@ A local web control panel for [zapret-discord-youtube](https://github.com/Flowse
 
 **Unofficial, independent companion tool — not affiliated with or endorsed by the zapret-discord-youtube project.**
 
-It replaces `service.bat`'s console menu and the bundled `test zapret.ps1` with a single browser-based dashboard (available in English and Russian — language switcher in the UI):
+It replaces `service.bat`'s console menu and the bundled `test zapret.ps1` with a single dashboard running as its own app window (available in English and Russian — language switcher in the UI):
 
 - **Test** — run every (or a chosen subset of) bypass strategy against a configurable set of services, see which strategy actually gets through, and enable the winner with one click.
 - **Manual launch** — start/stop any strategy directly, no test needed.
@@ -19,8 +19,8 @@ It replaces `service.bat`'s console menu and the bundled `test zapret.ps1` with 
 
 ## Requirements
 
-- Windows 10/11
-- The prebuilt `.exe` needs nothing extra — otherwise Python 3.9+, `curl.exe` and PowerShell (all three ship with modern Windows) to run from source
+- Windows 10/11 (needs the WebView2 Runtime — already bundled with Windows 10/11 alongside Edge)
+- The prebuilt `.exe` needs nothing extra — otherwise Python 3.9+, `curl.exe` and PowerShell (all three ship with modern Windows) plus `pip install -r requirements.txt` to run from source
 - One or more extracted [zapret-discord-youtube releases](https://github.com/Flowseal/zapret-discord-youtube/releases) (the folders that contain `bin/winws.exe`, `service.bat`, `general*.bat`, ...)
 
 ## Install
@@ -45,6 +45,7 @@ Downloads/
 ```
 
 ```
+pip install -r zapret-web-panel\requirements.txt
 set ZAPRET_BASE_DIR=C:\Users\you\Downloads
 python zapret-web-panel\zapret_web.py
 ```
@@ -59,7 +60,7 @@ python zapret_web.py
 
 or just run `zapret-web-panel.exe`.
 
-It requests admin rights via UAC (required — `winws.exe` needs the WinDivert driver), starts a local server on `127.0.0.1:8756`, and opens it in your default browser.
+It requests admin rights via UAC (required — `winws.exe` needs the WinDivert driver), starts a local server on `127.0.0.1:8756`, and opens its own app window (no console, no browser tab — the UI renders through the system WebView2 runtime).
 
 ## Security
 
@@ -84,7 +85,7 @@ The list of services the "Test" tab can test against lives in `targets.json`, cr
 ## Building the .exe yourself
 
 ```
-pip install pyinstaller
+pip install -r requirements.txt pyinstaller
 pyinstaller zapret-web-panel.spec
 ```
 

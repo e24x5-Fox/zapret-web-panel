@@ -19,8 +19,8 @@
 
 ## Требования
 
-- Windows 10/11
-- Готовый `.exe` не требует ничего лишнего — либо Python 3.9+, `curl.exe` и PowerShell (все три уже есть в современной Windows), если запускаете из исходников
+- Windows 10/11 (нужен WebView2 Runtime — он уже встроен в Windows 10/11 вместе с Edge)
+- Готовый `.exe` не требует ничего лишнего — либо Python 3.9+, `curl.exe` и PowerShell (все три уже есть в современной Windows) плюс `pip install -r requirements.txt`, если запускаете из исходников
 - Один или несколько распакованных [релизов zapret-discord-youtube](https://github.com/Flowseal/zapret-discord-youtube/releases) (папки с `bin/winws.exe`, `service.bat`, `general*.bat`, ...)
 
 ## Установка
@@ -45,6 +45,7 @@ Downloads/
 ```
 
 ```
+pip install -r zapret-web-panel\requirements.txt
 set ZAPRET_BASE_DIR=C:\Users\you\Downloads
 python zapret-web-panel\zapret_web.py
 ```
@@ -59,7 +60,7 @@ python zapret_web.py
 
 или просто запустите `zapret-web-panel.exe`.
 
-Панель запросит права администратора через UAC (обязательно — `winws.exe` нужен драйвер WinDivert), поднимет локальный сервер на `127.0.0.1:8756` и откроет его в браузере по умолчанию.
+Панель запросит права администратора через UAC (обязательно — `winws.exe` нужен драйвер WinDivert), поднимет локальный сервер на `127.0.0.1:8756` и откроет собственное окно приложения (без консоли и без вкладки браузера — интерфейс рендерится через системный WebView2).
 
 ## Безопасность
 
@@ -84,7 +85,7 @@ python zapret_web.py
 ## Сборка .exe самостоятельно
 
 ```
-pip install pyinstaller
+pip install -r requirements.txt pyinstaller
 pyinstaller zapret-web-panel.spec
 ```
 

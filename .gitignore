@@ -2,5 +2,6 @@ __pycache__/
 *.pyc
 test_results/
 targets.json
+scan_settings.json
 build/
 dist/
