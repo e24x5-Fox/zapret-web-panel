@@ -12,6 +12,7 @@ import json
 import os
 import secrets
 import shutil
+import subprocess
 import sys
 import threading
 import webbrowser
@@ -28,6 +29,24 @@ if sys.stdout is None:
     sys.stdout = open(os.devnull, "w")
 if sys.stderr is None:
     sys.stderr = open(os.devnull, "w")
+
+# zapret_tester/zapret_service/zapret_generator all shell out to console
+# tools (tasklist, sc, net, taskkill, curl, powershell...) via subprocess,
+# none of them passing CREATE_NO_WINDOW. With a console-subsystem parent
+# that's invisible (this is a windowed app now), Windows would otherwise pop
+# a brand new console window for every single one of those — most visibly
+# the winws-status poll the UI runs every 2 seconds. Patching Popen.__init__
+# once here (subprocess.run()/check_output()/etc. all construct a Popen
+# internally, so this covers every call site in every module) is far less
+# error-prone than adding the flag to ~40 individual call sites.
+if sys.platform == "win32":
+    _popen_init = subprocess.Popen.__init__
+
+    def _popen_init_no_window(self, *args, **kwargs):
+        kwargs["creationflags"] = kwargs.get("creationflags", 0) | subprocess.CREATE_NO_WINDOW
+        _popen_init(self, *args, **kwargs)
+
+    subprocess.Popen.__init__ = _popen_init_no_window
 
 import zapret_tester as zt
 import zapret_service as zs
