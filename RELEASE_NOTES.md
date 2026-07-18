@@ -1,3 +1,21 @@
+## zapret-web-panel v1.1.1
+
+Исправления после v1.1.0:
+
+- Убрано мелькание чёрного окна консоли, которое проскакивало каждые 1-2 секунды во время работы панели (побочный эффект перехода на оконное приложение без консоли — вспомогательные команды вроде проверки статуса winws запускали каждая своё консольное окно).
+- Добавлена нормальная иконка приложения вместо стандартной иконки PyInstaller.
+
+---
+
+## zapret-web-panel v1.1.1 (English)
+
+Fixes after v1.1.0:
+
+- Removed the black console window that flashed every 1-2 seconds while the panel was running (a side effect of moving to a console-less app window — helper commands like the winws status check were each popping their own console window).
+- Added a proper app icon instead of PyInstaller's generic default one.
+
+---
+
 ## zapret-web-panel v1.1.0
 
 Панель теперь запускается как обычное Windows-приложение — без консольного окна и без вкладки в браузере. Плюс новый интерфейс и два новых инструмента.
