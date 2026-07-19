@@ -1,3 +1,21 @@
+## zapret-web-panel v1.7.0
+
+Автоустановка WebView2 Runtime на Windows 10.
+
+### Что нового
+- На Windows 11 WebView2 Runtime встроен в систему, а на Windows 10 — нет, из-за чего панель без этого компонента тихо открывалась как вкладка браузера вместо отдельного окна. Теперь при первом запуске панель сама проверяет наличие компонента и, если его нет, автоматически скачивает и устанавливает официальный WebView2 Runtime от Microsoft (нужен интернет, разово может занять до минуты) — с предупреждением, чтобы пауза не выглядела зависанием.
+
+---
+
+## zapret-web-panel v1.7.0 (English)
+
+Auto-install WebView2 Runtime on Windows 10.
+
+### What's new
+- Windows 11 ships WebView2 Runtime built in; Windows 10 doesn't, so without it the panel silently opened as a browser tab instead of its own window. Now, on first launch, the panel checks for the component and, if missing, automatically downloads and installs Microsoft's official WebView2 Runtime (needs internet, may take up to a minute the first time) — with a heads-up message so the pause doesn't look like a hang.
+
+---
+
 ## zapret-web-panel v1.6.0
 
 Исправлена случайная печать поверх окна панели.
