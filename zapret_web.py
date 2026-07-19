@@ -85,7 +85,14 @@ PORT = 8756
 # The token is embedded into index.html at serve time (see _serve_static)
 # and attached to every request by web/app.js.
 SECRET_TOKEN = secrets.token_urlsafe(32)
-EXPECTED_HOST = f"127.0.0.1:{PORT}"
+# Some WebView2 Runtime builds send "Host: localhost:PORT" instead of
+# "Host: 127.0.0.1:PORT" for a plain loopback navigation (observed on a
+# tester's machine — the panel's own window got a raw {"error": "forbidden"}
+# JSON body instead of the UI). Both names resolve to the same loopback
+# interface, and this check is defense-in-depth on top of the token above
+# (the actual CSRF/DNS-rebinding defense), so accepting any loopback name
+# on our own port doesn't weaken anything real.
+_LOOPBACK_HOSTNAMES = {"127.0.0.1", "localhost", "[::1]"}
 
 
 # --------------------------------------------------------------------------- #
@@ -311,7 +318,8 @@ class Handler(BaseHTTPRequestHandler):
         return json.loads(raw.decode("utf-8")) if raw else {}
 
     def _host_ok(self) -> bool:
-        return self.headers.get("Host", "") == EXPECTED_HOST
+        host, _, port = self.headers.get("Host", "").rpartition(":")
+        return host.lower() in _LOOPBACK_HOSTNAMES and port == str(PORT)
 
     def _token_ok(self) -> bool:
         return secrets.compare_digest(self.headers.get("X-Zapret-Token", ""), SECRET_TOKEN)
