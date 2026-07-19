@@ -1,3 +1,29 @@
+## zapret-web-panel v1.4.0
+
+Редактор списков доменов и IP прямо в панели.
+
+### Что нового
+- **Домены и IP** — новый раздел: редактирование `list-general-user.txt` (домены, которые zapret точно будет обходить), `list-exclude-user.txt` (домены, которые zapret не будет трогать вообще) и `ipset-exclude-user.txt` (то же самое по IP/подсетям) для выбранной версии — без похода в проводник и блокнот. Эти списки применяют все стратегии `general*.bat` одинаково.
+
+Подробности — в [README](https://github.com/e24x5-Fox/zapret-web-panel#readme).
+
+**Неофициальный, независимый компаньон-инструмент — не аффилирован с zapret-discord-youtube.**
+
+---
+
+## zapret-web-panel v1.4.0 (English)
+
+An in-panel editor for the domain/IP user lists.
+
+### What's new
+- **Domains & IP** — a new section: edit `list-general-user.txt` (domains zapret will always bypass), `list-exclude-user.txt` (domains zapret leaves alone entirely), and `ipset-exclude-user.txt` (the same, by IP/subnet) for the selected version — no more Notepad/Explorer round-trip. Every `general*.bat` strategy of a version reads these the same way.
+
+See the [README](https://github.com/e24x5-Fox/zapret-web-panel#readme) for details.
+
+**Unofficial, independent companion tool — not affiliated with zapret-discord-youtube.**
+
+---
+
 ## zapret-web-panel v1.3.0
 
 Скачивание оригинальных релизов zapret прямо из панели, плюс пояснение по антивирусам.
