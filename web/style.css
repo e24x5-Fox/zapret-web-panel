@@ -431,6 +431,11 @@ select:focus, input[type="text"]:focus {
 .term-link:hover { text-decoration: underline; }
 .term-link:disabled { opacity: 0.5; cursor: not-allowed; text-decoration: none; }
 
+.settings-footer {
+  text-align: center;
+  padding: 4px 0 2px;
+}
+
 .found-paths {
   display: none;
   flex-direction: column;

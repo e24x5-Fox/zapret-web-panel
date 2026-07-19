@@ -100,3 +100,7 @@ The resulting `dist\zapret-web-panel.exe` is a single file that requests admin r
 ## License
 
 MIT — see [LICENSE](LICENSE). `zapret-discord-youtube` and `zapret` are themselves MIT-licensed by bol-van and Flowseal; this project doesn't bundle or redistribute their code, only automates the release folders you point it at.
+
+---
+
+If the panel has been useful, you can [support the project with a donation](https://dalink.to/e24x5). Completely optional, just appreciated.

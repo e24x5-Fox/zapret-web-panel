@@ -1171,6 +1171,8 @@ function switchView(showId, hideId) {
 $("open-settings").addEventListener("click", () => switchView("view-settings", "view-home"));
 $("close-settings").addEventListener("click", () => switchView("view-home", "view-settings"));
 
+$("support-link").addEventListener("click", () => window.open("https://dalink.to/e24x5", "_blank"));
+
 // ------------------------------------------------------------------ //
 // Служба tab
 // ------------------------------------------------------------------ //

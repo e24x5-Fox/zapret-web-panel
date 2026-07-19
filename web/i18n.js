@@ -221,6 +221,7 @@ const I18N = {
     btn_save: "Сохранить",
     msg_list_saved: "Сохранено",
     err_lists_no_version: "Выберите версию",
+    support_link: "☕ Поддержать проект",
   },
 
   en: {
@@ -443,6 +444,7 @@ const I18N = {
     btn_save: "Save",
     msg_list_saved: "Saved",
     err_lists_no_version: "Choose a version",
+    support_link: "☕ Support the project",
   },
 };
 
