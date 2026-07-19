@@ -1,3 +1,21 @@
+## zapret-web-panel v1.5.0
+
+Необязательная ссылка на поддержку проекта.
+
+### Что нового
+- В настройках панели и в README появилась скромная ссылка «Поддержать проект» (DonationAlerts) — полностью необязательная.
+
+---
+
+## zapret-web-panel v1.5.0 (English)
+
+An optional link to support the project.
+
+### What's new
+- A low-key "Support the project" link (DonationAlerts) in the panel's settings footer and in the README — entirely optional.
+
+---
+
 ## zapret-web-panel v1.4.0
 
 Редактор списков доменов и IP прямо в панели.
