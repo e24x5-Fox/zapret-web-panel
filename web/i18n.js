@@ -21,8 +21,11 @@ const I18N = {
     home_sub_connected: "Работает стратегия «{strategy}» — нажмите, чтобы остановить",
     home_sub_disconnected: "Нажмите, чтобы запустить «{strategy}»",
     home_sub_no_strategy: "Выберите стратегию ниже",
+    home_sub_zapret2_not_configured: "Укажите папку с zapret2 в настройках",
     home_version_label: "Версия: {version}",
     home_admin_warning: "Панель запущена без прав администратора — обход работать не будет.",
+    engine_zapret1: "Zapret",
+    engine_zapret2: "Zapret2",
     settings_header: "Настройки",
 
     test_title: "Тест стратегий",
@@ -173,6 +176,24 @@ const I18N = {
     label_baseline: "Без обхода (baseline)",
     confirm_run_generator_title: "Запустить подбор стратегии?",
     confirm_run_generator_msg: "Будет перебран набор комбинаций методов dpi-desync и протестирован по сервисам: {services}.\nЭто может занять продолжительное время.",
+
+    // zapret2 (alternative engine) panel
+    menu_cat_alt_engine: "ALTERNATIVE ENGINE",
+    menu_zapret2: "Zapret2 (эксперимент.)",
+    zapret2_desc: "Отдельный движок (bol-van/zapret2, winws2.exe) — необязательная альтернатива. Основной обход по-прежнему работает через обычный zapret выше.",
+    field_zapret2_version: "Версия zapret2",
+    field_zapret2_profile: "Профиль",
+    zapret2_not_configured: "версии не найдены",
+    zapret2_ready: "готово к запуску",
+    zapret2_running: "winws2: запущен",
+    zapret2_running_caps: "winws2 ЗАПУЩЕН",
+    btn_zapret2_launch: "Запустить",
+    err_zapret2_no_profile: "Выберите профиль",
+    err_zapret2_no_version: "Версия zapret2 не найдена — обновите список",
+    msg_zapret2_launched: "Запущено: {profile}",
+    msg_zapret2_stopped: "winws2 остановлен",
+    menu_zapret2_generator: "ГЕНЕРАТОР ДЛЯ ZAPRET2",
+    zapret2_generator_desc: "Перебирает комбинации lua-desync методов (fake, multisplit, multidisorder, fakedsplit, fakeddisorder, hostfakesplit, syndata) для выбранной выше версии и тестирует каждую — как обычный генератор, но для zapret2.",
   },
 
   en: {
@@ -195,8 +216,11 @@ const I18N = {
     home_sub_connected: "“{strategy}” is running — click to stop",
     home_sub_disconnected: "Click to launch “{strategy}”",
     home_sub_no_strategy: "Choose a strategy below",
+    home_sub_zapret2_not_configured: "Point at a zapret2 folder in Settings",
     home_version_label: "Version: {version}",
     home_admin_warning: "The panel is running without administrator rights — the bypass won't work.",
+    engine_zapret1: "Zapret",
+    engine_zapret2: "Zapret2",
     settings_header: "Settings",
 
     test_title: "Strategy test",
@@ -347,6 +371,24 @@ const I18N = {
     label_baseline: "No bypass (baseline)",
     confirm_run_generator_title: "Run the strategy generator?",
     confirm_run_generator_msg: "This will try a set of dpi-desync method combinations and test each against: {services}.\nThis can take a while.",
+
+    // zapret2 (alternative engine) panel
+    menu_cat_alt_engine: "ALTERNATIVE ENGINE",
+    menu_zapret2: "Zapret2 (experimental)",
+    zapret2_desc: "A separate engine (bol-van/zapret2, winws2.exe) — an optional alternative. The main bypass above still runs on regular zapret.",
+    field_zapret2_version: "Zapret2 version",
+    field_zapret2_profile: "Profile",
+    zapret2_not_configured: "no versions found",
+    zapret2_ready: "ready to launch",
+    zapret2_running: "winws2: running",
+    zapret2_running_caps: "winws2 RUNNING",
+    btn_zapret2_launch: "Launch",
+    err_zapret2_no_profile: "Choose a profile",
+    err_zapret2_no_version: "Zapret2 version not found — reload the list",
+    msg_zapret2_launched: "Launched: {profile}",
+    msg_zapret2_stopped: "winws2 stopped",
+    menu_zapret2_generator: "ZAPRET2 GENERATOR",
+    zapret2_generator_desc: "Tries combinations of lua-desync methods (fake, multisplit, multidisorder, fakedsplit, fakeddisorder, hostfakesplit, syndata) for the version selected above and tests each one — the same idea as the regular generator, but for zapret2.",
   },
 };
 

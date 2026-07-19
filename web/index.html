@@ -23,6 +23,11 @@
 
   <div class="view view-home active visible" id="view-home">
     <div class="home-card">
+      <div class="segmented home-engine-switch" id="engine-segmented">
+        <button type="button" data-value="zapret1" class="active" data-i18n="engine_zapret1">Zapret</button>
+        <button type="button" data-value="zapret2" data-i18n="engine_zapret2">Zapret2</button>
+      </div>
+
       <button id="connect-circle" class="connect-circle" type="button" data-i18n-aria="btn_open_settings_hint" aria-label="Подключиться / отключиться">
         <span class="connect-icon">⏻</span>
       </button>
@@ -30,7 +35,7 @@
       <div class="connect-sub" id="connect-sub" data-i18n="home_sub_no_strategy">Выберите стратегию ниже</div>
 
       <div class="home-field">
-        <label for="hero-strategy-select" data-i18n="field_strategy">Стратегия</label>
+        <label for="hero-strategy-select" id="hero-strategy-label" data-i18n="field_strategy">Стратегия</label>
         <select id="hero-strategy-select"></select>
       </div>
 
@@ -253,6 +258,75 @@
           </div>
           <pre id="generator-log" class="console"></pre>
           <div id="generator-summary" class="summary-list"></div>
+        </div></div>
+
+        <div class="menu-cat" data-i18n="menu_cat_alt_engine">ALTERNATIVE ENGINE</div>
+
+        <div class="menu-item" data-target="panel-zapret2">
+          <span class="menu-num">13.</span><span class="menu-label" data-i18n="menu_zapret2">Zapret2 (эксперимент.)</span>
+          <span class="menu-state" id="state-zapret2">[...]</span>
+        </div>
+        <div class="menu-panel" id="panel-zapret2"><div class="menu-panel-inner">
+          <p class="muted" data-i18n="zapret2_desc">Отдельный движок (bol-van/zapret2, winws2.exe) — необязательная альтернатива. Основной обход по-прежнему работает через обычный zapret выше.</p>
+
+          <div class="field-row">
+            <div class="field grow">
+              <label for="zapret2-version-select" data-i18n="field_zapret2_version">Версия zapret2</label>
+              <select id="zapret2-version-select" class="term-select"></select>
+            </div>
+            <button id="zapret2-reload-versions" class="btn btn-ghost btn-small" data-i18n="btn_reload_versions">Обновить список версий</button>
+          </div>
+
+          <div class="meta-line"><span id="zapret2-dot" class="dot"></span><span id="zapret2-text" data-i18n="zapret2_not_configured">версии не найдены</span></div>
+
+          <div class="field-row">
+            <div class="field grow">
+              <label data-i18n="field_zapret2_profile">Профиль</label>
+              <select id="zapret2-profile-select"></select>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button id="zapret2-launch" class="btn btn-primary" data-i18n="btn_zapret2_launch">Запустить</button>
+            <button id="zapret2-stop" class="btn btn-danger" data-i18n="btn_stop">Остановить</button>
+          </div>
+
+          <div class="zapret2-generator-block">
+            <div class="menu-cat" data-i18n="menu_zapret2_generator">ГЕНЕРАТОР ДЛЯ ZAPRET2</div>
+            <p class="muted" data-i18n="zapret2_generator_desc">Перебирает комбинации lua-desync методов (fake, multisplit, multidisorder, fakedsplit, fakeddisorder, hostfakesplit, syndata) для выбранной выше версии и тестирует каждую — как обычный генератор, но для zapret2.</p>
+
+            <div class="field-row">
+              <div class="field">
+                <label data-i18n="label_generator_mode">Режим</label>
+                <div class="segmented" id="zapret2-generator-mode-segmented">
+                  <button data-value="simple" class="active" data-i18n="generator_mode_simple">Простой</button>
+                  <button data-value="advanced" data-i18n="generator_mode_advanced">Продвинутый</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="card services-card">
+              <div class="card-header">
+                <h3 data-i18n="services_title">Сервисы</h3>
+                <div class="card-actions">
+                  <button id="zapret2-generator-services-select-all" class="btn btn-ghost btn-small" data-i18n="select_all">Все</button>
+                  <button id="zapret2-generator-services-select-none" class="btn btn-ghost btn-small" data-i18n="select_none">Ничего</button>
+                </div>
+              </div>
+              <div id="zapret2-generator-service-list" class="strategy-list"></div>
+            </div>
+
+            <div class="progress-wrap">
+              <div class="progress-bar"><div id="zapret2-generator-progress-fill" class="progress-fill"></div></div>
+              <span id="zapret2-generator-progress-text" class="progress-text">0/0</span>
+            </div>
+            <div class="btn-row">
+              <button id="zapret2-run-generator" class="btn btn-primary" data-i18n="btn_run_generator">Подобрать стратегию</button>
+              <button id="zapret2-stop-generator" class="btn btn-danger" disabled data-i18n="btn_stop">Остановить</button>
+            </div>
+            <pre id="zapret2-generator-log" class="console"></pre>
+            <div id="zapret2-generator-summary" class="summary-list"></div>
+          </div>
         </div></div>
 
       </div>

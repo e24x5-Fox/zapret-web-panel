@@ -5,3 +5,6 @@ targets.json
 scan_settings.json
 build/
 dist/
+zapret2-bundle/
+zapret2-master/
+zapret2-v1.0.2-release-UNSAFE/

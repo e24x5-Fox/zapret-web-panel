@@ -13,10 +13,12 @@ import ctypes
 import json
 import os
 import re
+import secrets
 import socket
 import string
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
@@ -399,22 +401,82 @@ def winws_running() -> bool:
 
 # --------------------------------------------------------------------------- #
 # Connectivity checks
+#
+# check_http used to be a bare `curl -I` HEAD request. That's blind to the
+# most common real-world DPI behavior: a lot of censoring middleboxes only
+# inspect the first ~16-20KB of a new TCP stream and let it through, then
+# kill/freeze the connection once it runs past that — a HEAD request never
+# transfers anywhere near that much data, so it can score a strategy (or
+# even "no strategy at all") as fully working when the actual services
+# would freeze solid under real use. zapret-discord-youtube's own
+# utils/test zapret.ps1 has a "DPI checkers (TCP 16-20 freeze)" mode built
+# specifically to catch this — this port follows the same technique:
+# upload a real payload over HTTP/1.1, TLS1.2 and TLS1.3, and flag it as
+# blocked if bytes went out, nothing came back, and it ran to the timeout.
 # --------------------------------------------------------------------------- #
 
+DPI_RANGE_BYTES = 65536  # matches test zapret.ps1's default probe size
+
+_dpi_payload_cache = {}
+
+
+def _dpi_payload_path(range_bytes: int) -> Path:
+    """Cached temp file of random bytes reused across every check in this
+    run (regenerating per-host would just waste time; the DPI freeze
+    signature doesn't depend on the payload's actual content)."""
+    cached = _dpi_payload_cache.get(range_bytes)
+    if cached and cached.exists():
+        return cached
+    path = Path(tempfile.gettempdir()) / f"zapret_dpi_probe_{range_bytes}.bin"
+    if not path.exists() or path.stat().st_size != range_bytes:
+        path.write_bytes(secrets.token_bytes(range_bytes))
+    _dpi_payload_cache[range_bytes] = path
+    return path
+
+
+_DPI_PROTOCOL_VARIANTS = [
+    ["--http1.1"],
+    ["--tlsv1.2", "--tls-max", "1.2"],
+    ["--tlsv1.3", "--tls-max", "1.3"],
+]
+
+_DPI_RESULT_RE = re.compile(r"^(\d{3})\s+(\d+)\s+(\d+)\s+([\d.]+)$")
+
+
 def check_http(host: str, timeout=CURL_TIMEOUT):
+    payload = _dpi_payload_path(DPI_RANGE_BYTES)
     t0 = time.time()
-    try:
-        res = subprocess.run(
-            ["curl.exe", "-I", "-s", "-m", str(timeout), "-o", "NUL",
-             "-w", "%{http_code}", f"https://{host}"],
-            capture_output=True, timeout=timeout + 3, text=True,
-        )
-        elapsed = time.time() - t0
-        code = res.stdout.strip()
-        ok = res.returncode == 0 and code.isdigit() and code != "000"
-        return ok, code or "ERR", elapsed
-    except Exception:
-        return False, "ERR", time.time() - t0
+    any_ok = False
+    any_frozen = False
+    last_code = "ERR"
+
+    for variant_args in _DPI_PROTOCOL_VARIANTS:
+        try:
+            res = subprocess.run(
+                ["curl.exe", "--range", f"0-{DPI_RANGE_BYTES - 1}", "-m", str(timeout),
+                 "-w", "%{http_code} %{size_upload} %{size_download} %{time_total}",
+                 "-o", "NUL", "-X", "POST", "--data-binary", f"@{payload}", "-s",
+                 *variant_args, f"https://{host}"],
+                capture_output=True, timeout=timeout + 3, text=True,
+            )
+            m = _DPI_RESULT_RE.match(res.stdout.strip())
+            if not m:
+                continue
+            code, up_bytes, down_bytes, duration = m.group(1), int(m.group(2)), int(m.group(3)), float(m.group(4))
+            last_code = code
+            if up_bytes > 0 and down_bytes == 0 and duration >= timeout and res.returncode != 0:
+                any_frozen = True
+            elif res.returncode == 0:
+                any_ok = True
+        except Exception:
+            continue
+
+    elapsed = time.time() - t0
+    if any_ok:
+        return True, last_code, elapsed
+    if any_frozen:
+        return False, "DPI_FREEZE", elapsed
+    return False, last_code or "ERR", elapsed
 
 
 def check_tcp443(host: str, timeout=CURL_TIMEOUT):

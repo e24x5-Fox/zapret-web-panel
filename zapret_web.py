@@ -51,6 +51,8 @@ if sys.platform == "win32":
 import zapret_tester as zt
 import zapret_service as zs
 import zapret_generator as zg
+import zapret2_engine as z2
+import zapret2_generator as zg2
 from i18n import t
 
 def _resource_dir() -> Path:
@@ -209,6 +211,12 @@ class GeneratorSession:
 
 generator_session = GeneratorSession()
 
+# Separate instance for the zapret2 generator — GeneratorSession's state
+# machine doesn't reference zapret1 anywhere, so it's reused as-is; only a
+# distinct instance is needed so the two searches can't clobber each other's
+# progress/results if a user somehow triggered both.
+zapret2_generator_session = GeneratorSession()
+
 
 # --------------------------------------------------------------------------- #
 # version scan cache — name -> absolute Path, populated by _do_rescan().
@@ -241,6 +249,32 @@ def _version_dir(name, lang="ru"):
     vd = _version_paths.get(name)
     if not vd or not vd.exists() or not (vd / "bin" / "winws.exe").exists():
         raise ValueError(t(lang, "err_unknown_version", name=name))
+    return vd
+
+
+# zapret2 (alternative engine) version scan cache — same shape as the
+# zapret1 cache above, always whole-computer (zapret2 installs have no
+# reliable naming convention to support a "custom folder" mode against).
+_zapret2_version_paths = {}
+_zapret2_scan_lock = threading.Lock()
+
+
+def _do_rescan_zapret2():
+    found = z2.find_versions_global()
+    with _zapret2_scan_lock:
+        _zapret2_version_paths.clear()
+        _zapret2_version_paths.update(found)
+    return sorted(_zapret2_version_paths.keys(), key=zt.natural_key)
+
+
+def _zapret2_version_dir(name, lang="ru"):
+    if not name:
+        return None
+    if not _zapret2_version_paths:
+        _do_rescan_zapret2()
+    vd = _zapret2_version_paths.get(name)
+    if not vd or not z2.find_engine_dir(vd):
+        return None
     return vd
 
 
@@ -326,8 +360,31 @@ class Handler(BaseHTTPRequestHandler):
                 since = int(qs.get("since", ["0"])[0])
                 return self._send_json(generator_session.snapshot(since))
 
+            if path == "/api/zapret2/generator/status":
+                since = int(qs.get("since", ["0"])[0])
+                return self._send_json(zapret2_generator_session.snapshot(since))
+
             if path == "/api/manual/status":
                 return self._send_json({"running": zt.winws_running()})
+
+            if path == "/api/zapret2/versions":
+                if qs.get("rescan", ["0"])[0] == "1" or not _zapret2_version_paths:
+                    names = _do_rescan_zapret2()
+                else:
+                    names = sorted(_zapret2_version_paths.keys(), key=zt.natural_key)
+                return self._send_json({
+                    "versions": names,
+                    "paths": {name: str(p) for name, p in _zapret2_version_paths.items()},
+                })
+
+            if path == "/api/zapret2/state":
+                vd = _zapret2_version_dir(qs.get("version", [None])[0], lang)
+                profiles = [p.name for p in z2.find_profiles(vd)] if vd else []
+                return self._send_json({
+                    "valid": vd is not None,
+                    "profiles": profiles,
+                    "running": z2.winws2_running(),
+                })
 
             if path == "/api/service/status":
                 vd = _version_dir(qs.get("version", [None])[0], lang)
@@ -485,6 +542,71 @@ class Handler(BaseHTTPRequestHandler):
         out_path = zg.save_candidate(vd, generator_session.texts, candidate, data.get("save_as") or candidate)
         return self._send_json({"ok": True, "path": str(out_path)})
 
+    def _zapret2_generator_start(self, data, lang):
+        if zapret2_generator_session.running:
+            return self._send_error_json(t(lang, "err_generator_already_running"))
+        engine_dir = _zapret2_version_dir(data.get("version"), lang)
+        if not engine_dir:
+            return self._send_error_json(t(lang, "err_zapret2_no_version"))
+        mode = data.get("mode")
+        if mode not in ("simple", "advanced"):
+            return self._send_error_json(t(lang, "err_bad_generator_mode"))
+
+        service_names = data.get("services") or []
+        targets = {k: v for k, v in zt.TARGETS.items() if k in service_names} or zt.TARGETS
+        if not targets:
+            return self._send_error_json(t(lang, "err_services_not_found"))
+
+        total = (
+            len(zg2.SIMPLE_SPACE) if mode == "simple"
+            else len(zg2.TLS_METHODS) * len(zg2.HTTP_METHODS) + 12
+        )
+        version_name = data.get("version")
+        zapret2_generator_session.reset(version_name, total)
+
+        def worker():
+            all_results, best_per_service, overall_best, texts, baseline, inconclusive = zg2.run_generator(
+                engine_dir, mode, targets=targets, log=zapret2_generator_session.append_log,
+                should_stop=lambda: zapret2_generator_session.stop_requested, lang=lang,
+            )
+            best = None
+            if all_results:
+                total_targets = sum(len(v) for v in targets.values())
+                best = {
+                    "per_service": {
+                        svc: {"strategy": name, "score": res[svc]["score"], "total": res[svc]["total"]}
+                        for svc, (name, res) in best_per_service.items()
+                    },
+                    "overall": {
+                        "strategy": overall_best[0],
+                        "score": sum(d["score"] for d in overall_best[1].values()),
+                        "total": total_targets,
+                    } if overall_best else None,
+                }
+            baseline_out = {
+                svc: {"score": d["score"], "total": d["total"]} for svc, d in (baseline or {}).items()
+            } if baseline else None
+            zapret2_generator_session.finish(all_results, best, texts, baseline_out, inconclusive)
+
+        threading.Thread(target=worker, daemon=True).start()
+        return self._send_json({"ok": True})
+
+    def _zapret2_generator_stop(self, data, lang):
+        zapret2_generator_session.stop_requested = True
+        return self._send_json({"ok": True})
+
+    def _zapret2_generator_save(self, data, lang):
+        engine_dir = _zapret2_version_dir(data.get("version"), lang)
+        if not engine_dir:
+            raise ValueError(t(lang, "err_zapret2_no_version"))
+        candidate = data["candidate"]
+        if zapret2_generator_session.version != data.get("version") or candidate not in zapret2_generator_session.texts:
+            raise ValueError(t(lang, "err_generator_candidate_not_found"))
+        out_path = zg2.save_candidate(
+            engine_dir, zapret2_generator_session.texts, candidate, data.get("save_as") or candidate
+        )
+        return self._send_json({"ok": True, "path": str(out_path)})
+
     def _manual_launch(self, data, lang):
         vd = _version_dir(data["version"], lang)
         bat = vd / data["strategy"]
@@ -495,6 +617,22 @@ class Handler(BaseHTTPRequestHandler):
 
     def _manual_stop(self, data, lang):
         zt.kill_winws()
+        return self._send_json({"ok": True})
+
+    def _zapret2_launch(self, data, lang):
+        engine_dir = _zapret2_version_dir(data.get("version"), lang)
+        if not engine_dir:
+            raise ValueError(t(lang, "err_zapret2_no_version"))
+        profile_name = data.get("profile")
+        all_profiles = {p.name: p for p in z2.find_profiles(engine_dir)}
+        profile = all_profiles.get(profile_name)
+        if not profile:
+            raise ValueError(t(lang, "err_zapret2_profile_not_found"))
+        z2.launch_profile(profile, engine_dir)
+        return self._send_json({"ok": True})
+
+    def _zapret2_stop(self, data, lang):
+        z2.kill_winws2()
         return self._send_json({"ok": True})
 
     def _service_install(self, data, lang):
@@ -588,6 +726,11 @@ class Handler(BaseHTTPRequestHandler):
         "/api/generator/save": _generator_save,
         "/api/manual/launch": _manual_launch,
         "/api/manual/stop": _manual_stop,
+        "/api/zapret2/launch": _zapret2_launch,
+        "/api/zapret2/stop": _zapret2_stop,
+        "/api/zapret2/generator/start": _zapret2_generator_start,
+        "/api/zapret2/generator/stop": _zapret2_generator_stop,
+        "/api/zapret2/generator/save": _zapret2_generator_save,
         "/api/service/install": _service_install,
         "/api/service/remove": _service_remove,
         "/api/service/settings/game_filter": _settings_game_filter,

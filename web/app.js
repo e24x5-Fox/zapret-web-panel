@@ -279,7 +279,7 @@ async function loadStrategiesForAllTabs() {
   const { strategies } = await API.get(`/api/strategies?version=${encodeURIComponent(state.version)}`);
   state.strategies = strategies;
   renderTestStrategyList(strategies);
-  renderSelect("hero-strategy-select", strategies);
+  populateHeroSelect();
   renderSelect("service-strategy", strategies);
   updateConnectUI();
   await loadServiceSettings();
@@ -662,34 +662,101 @@ $("stop-generator").addEventListener("click", stopGenerator);
 
 // ------------------------------------------------------------------ //
 // home screen — VPN-style connect circle (manual launch/stop)
+//
+// currentEngine only decides which engine's status/profile list the home
+// circle displays and talks to — a display-level switch, not a system
+// change. zapret1 stays the actual default: it's what a fresh install
+// starts on, and switching back never touches any zapret2 state.
 // ------------------------------------------------------------------ //
+
+let currentEngine = localStorage.getItem("zapret_engine") === "zapret2" ? "zapret2" : "zapret1";
+
+function isEngineRunning() {
+  return currentEngine === "zapret2" ? zapret2State.running : winwsRunning;
+}
+
+function populateHeroSelect() {
+  if (currentEngine === "zapret2") {
+    $("hero-strategy-label").textContent = t("field_zapret2_profile");
+    renderSelect("hero-strategy-select", zapret2State.profiles);
+  } else {
+    $("hero-strategy-label").textContent = t("field_strategy");
+    renderSelect("hero-strategy-select", state.strategies);
+  }
+}
 
 function updateConnectUI() {
   const circle = $("connect-circle");
   const select = $("hero-strategy-select");
+  const running = isEngineRunning();
   const strategy = select.value;
+  const alt = currentEngine === "zapret2";
 
-  circle.classList.toggle("connected", winwsRunning);
-  select.disabled = winwsRunning;
+  circle.classList.toggle("connected", running);
+  circle.classList.toggle("alt-engine", alt);
+  select.disabled = running;
 
   const statusEl = $("connect-status");
-  statusEl.classList.toggle("connected", winwsRunning);
-  statusEl.textContent = winwsRunning ? t("home_status_connected") : t("home_status_disconnected");
+  statusEl.classList.toggle("connected", running);
+  statusEl.classList.toggle("alt-engine", alt);
+  statusEl.textContent = running ? t("home_status_connected") : t("home_status_disconnected");
 
-  if (winwsRunning) {
+  if (alt && !zapret2State.valid) {
+    $("connect-sub").textContent = t("home_sub_zapret2_not_configured");
+  } else if (running) {
     $("connect-sub").textContent = t("home_sub_connected", { strategy: strategy || "" });
   } else if (strategy) {
     $("connect-sub").textContent = t("home_sub_disconnected", { strategy });
   } else {
     $("connect-sub").textContent = t("home_sub_no_strategy");
   }
+
+  $("home-version-label").textContent = alt
+    ? (zapret2State.version ? t("home_version_label", { version: `Zapret2 ${zapret2State.version}` }) : "")
+    : (state.version ? t("home_version_label", { version: state.version }) : "");
 }
 
 $("hero-strategy-select").addEventListener("change", updateConnectUI);
 
+document.querySelectorAll("#engine-segmented button").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    if (btn.dataset.value === currentEngine || isEngineRunning()) return;
+    currentEngine = btn.dataset.value;
+    localStorage.setItem("zapret_engine", currentEngine);
+    document.querySelectorAll("#engine-segmented button").forEach((b) => {
+      b.classList.toggle("active", b.dataset.value === currentEngine);
+    });
+    populateHeroSelect();
+    updateConnectUI();
+  });
+});
+
 $("connect-circle").addEventListener("click", async () => {
-  if (!state.version) return toast(t("err_select_version"), "error");
   const circle = $("connect-circle");
+
+  if (currentEngine === "zapret2") {
+    if (!zapret2State.valid) return toast(t("home_sub_zapret2_not_configured"), "error");
+    circle.classList.add("busy");
+    try {
+      if (zapret2State.running) {
+        await API.post("/api/zapret2/stop", {});
+        toast(t("msg_zapret2_stopped"), "success");
+      } else {
+        const profile = $("hero-strategy-select").value;
+        if (!profile) { toast(t("err_zapret2_no_profile"), "error"); return; }
+        await API.post("/api/zapret2/launch", { profile });
+        toast(t("msg_zapret2_launched", { profile }), "success");
+      }
+    } catch (e) {
+      toast(e.message, "error");
+    } finally {
+      circle.classList.remove("busy");
+      await loadZapret2State();
+    }
+    return;
+  }
+
+  if (!state.version) return toast(t("err_select_version"), "error");
   circle.classList.add("busy");
   try {
     if (winwsRunning) {
@@ -708,6 +775,256 @@ $("connect-circle").addEventListener("click", async () => {
     await pollWinwsStatus();
   }
 });
+
+// ------------------------------------------------------------------ //
+// Zapret2 (alternative engine) panel — fully independent of the zapret1
+// version/strategy state above; the home connect circle never touches it.
+// Versions are auto-discovered by a whole-computer scan (same idea as the
+// zapret1 version scan), no manual folder picking needed.
+// ------------------------------------------------------------------ //
+
+let zapret2State = { version: null, versions: [], paths: {}, profiles: [], valid: false, running: false };
+
+async function loadZapret2Versions(rescan) {
+  const { versions, paths } = await API.get(`/api/zapret2/versions${rescan ? "?rescan=1" : ""}`);
+  zapret2State.versions = versions;
+  zapret2State.paths = paths || {};
+  const sel = $("zapret2-version-select");
+  const prev = sel.value;
+  sel.innerHTML = versions.map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
+  if (versions.includes(prev)) {
+    sel.value = prev;
+  } else if (versions.length) {
+    sel.value = versions[versions.length - 1];
+  }
+  zapret2State.version = sel.value || null;
+}
+
+function renderZapret2State() {
+  setDotStatus("zapret2-dot", zapret2State.running);
+  $("zapret2-text").textContent = zapret2State.running
+    ? t("zapret2_running")
+    : (zapret2State.valid ? t("zapret2_ready") : t("zapret2_not_configured"));
+  $("state-zapret2").textContent = zapret2State.running
+    ? `[${t("zapret2_running_caps")}]`
+    : (zapret2State.valid ? "[OK]" : "[...]");
+  renderSelect("zapret2-profile-select", zapret2State.profiles);
+  $("zapret2-launch").disabled = !zapret2State.valid || !zapret2State.profiles.length;
+}
+
+async function loadZapret2State() {
+  try {
+    if (!zapret2State.versions.length) await loadZapret2Versions();
+    const qs = zapret2State.version ? `?version=${encodeURIComponent(zapret2State.version)}` : "";
+    const snap = await API.get(`/api/zapret2/state${qs}`);
+    zapret2State = { ...zapret2State, ...snap };
+    renderZapret2State();
+    if (currentEngine === "zapret2") populateHeroSelect();
+    updateConnectUI();
+  } catch (e) { /* transient — keep last known state */ }
+}
+
+$("zapret2-version-select").addEventListener("change", async (e) => {
+  zapret2State.version = e.target.value || null;
+  await loadZapret2State();
+});
+
+$("zapret2-reload-versions").addEventListener("click", async () => {
+  const btn = $("zapret2-reload-versions");
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = t("msg_scanning");
+  try {
+    await loadZapret2Versions(true);
+    await loadZapret2State();
+    toast(t("msg_versions_reloaded"), "info");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+});
+
+$("zapret2-launch").addEventListener("click", async () => {
+  if (!zapret2State.version) return toast(t("err_zapret2_no_version"), "error");
+  const profile = $("zapret2-profile-select").value;
+  if (!profile) return toast(t("err_zapret2_no_profile"), "error");
+  try {
+    await API.post("/api/zapret2/launch", { version: zapret2State.version, profile });
+    toast(t("msg_zapret2_launched", { profile }), "success");
+  } catch (e) {
+    toast(e.message, "error");
+  } finally {
+    await loadZapret2State();
+  }
+});
+
+$("zapret2-stop").addEventListener("click", async () => {
+  try {
+    await API.post("/api/zapret2/stop", {});
+    toast(t("msg_zapret2_stopped"), "success");
+  } catch (e) {
+    toast(e.message, "error");
+  } finally {
+    await loadZapret2State();
+  }
+});
+
+// ------------------------------------------------------------------ //
+// Zapret2 generator — mirrors the zapret1 generator tab above, scoped to
+// whatever zapret2 version is selected in the panel just above it.
+// ------------------------------------------------------------------ //
+
+let zapret2GeneratorMode = "simple";
+let zapret2GeneratorLogCursor = 0;
+let zapret2GeneratorPollTimer = null;
+
+async function loadZapret2GeneratorServiceCatalog() {
+  const { services } = await API.get("/api/services");
+  renderServiceChecklist("zapret2-generator-service-list", "z2-gen-service-checkbox-filter", services);
+}
+
+wireSelectAllNone(
+  "zapret2-generator-services-select-all", "zapret2-generator-services-select-none",
+  "z2-gen-service-checkbox-filter",
+);
+
+document.querySelectorAll("#zapret2-generator-mode-segmented button").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    zapret2GeneratorMode = btn.dataset.value;
+    setSegmentedValue("zapret2-generator-mode-segmented", zapret2GeneratorMode);
+  });
+});
+
+function setZapret2GeneratorRunningUI(running) {
+  $("zapret2-run-generator").disabled = running;
+  $("zapret2-stop-generator").disabled = !running;
+}
+
+function updateZapret2GeneratorProgress({ done, total }) {
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  $("zapret2-generator-progress-fill").style.width = pct + "%";
+  $("zapret2-generator-progress-text").textContent = `${done}/${total}`;
+}
+
+function appendZapret2GeneratorLogLines(lines) {
+  if (!lines || !lines.length) return;
+  const el = $("zapret2-generator-log");
+  el.textContent += lines.join("\n") + "\n";
+  el.scrollTop = el.scrollHeight;
+}
+
+async function saveZapret2Candidate(name, btn) {
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = t("msg_saving");
+  try {
+    const { path } = await API.post("/api/zapret2/generator/save", {
+      version: zapret2State.version, candidate: name, save_as: name,
+    });
+    toast(t("msg_strategy_saved", { path }), "success");
+    await loadZapret2State();
+  } catch (e) {
+    toast(e.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+
+function zapret2GeneratorSummaryRow(label, value, candidateName) {
+  const row = document.createElement("div");
+  row.className = "summary-row";
+  row.innerHTML = `
+    <div>
+      <div class="summary-label">${escapeHtml(label)}</div>
+      <div class="summary-value">${escapeHtml(value)}</div>
+    </div>
+    <button class="btn btn-primary btn-small">${t("btn_save_strategy")}</button>`;
+  row.querySelector("button").addEventListener("click", (e) => saveZapret2Candidate(candidateName, e.target));
+  return row;
+}
+
+function renderZapret2GeneratorSummary(snap) {
+  const container = $("zapret2-generator-summary");
+  container.innerHTML = "";
+
+  if (snap.baseline) {
+    const baselineText = Object.entries(snap.baseline).map(([svc, d]) => `${svc} ${d.score}/${d.total}`).join(", ");
+    const el = document.createElement("div");
+    el.className = "muted small";
+    el.textContent = `${t("label_baseline")}: ${baselineText}`;
+    container.appendChild(el);
+  }
+
+  if (!snap.best) {
+    const el = document.createElement("div");
+    el.className = "muted";
+    el.textContent = t("msg_no_results");
+    container.appendChild(el);
+    return;
+  }
+
+  for (const [service, info] of Object.entries(snap.best.per_service)) {
+    container.appendChild(zapret2GeneratorSummaryRow(service, `${info.strategy} (${info.score}/${info.total})`, info.strategy));
+  }
+  if (snap.best.overall) {
+    container.appendChild(zapret2GeneratorSummaryRow(
+      t("label_best_overall"),
+      `${snap.best.overall.strategy} (${snap.best.overall.score}/${snap.best.overall.total})`,
+      snap.best.overall.strategy
+    ));
+  }
+}
+
+async function startZapret2Generator() {
+  if (!zapret2State.version) return toast(t("err_zapret2_no_version"), "error");
+  const services = getSelectedFromClass("z2-gen-service-checkbox-filter");
+  if (!services.length) return toast(t("err_select_service"), "error");
+
+  const ok = await confirmModal(t("confirm_run_generator_title"), t("confirm_run_generator_msg", { services: services.join(", ") }));
+  if (!ok) return;
+
+  $("zapret2-generator-log").textContent = "";
+  $("zapret2-generator-summary").innerHTML = "";
+  zapret2GeneratorLogCursor = 0;
+  updateZapret2GeneratorProgress({ done: 0, total: 0 });
+  setZapret2GeneratorRunningUI(true);
+
+  try {
+    await API.post("/api/zapret2/generator/start", { version: zapret2State.version, mode: zapret2GeneratorMode, services });
+  } catch (e) {
+    toast(e.message, "error");
+    setZapret2GeneratorRunningUI(false);
+    return;
+  }
+  pollZapret2Generator();
+}
+
+function pollZapret2Generator() {
+  clearInterval(zapret2GeneratorPollTimer);
+  zapret2GeneratorPollTimer = setInterval(async () => {
+    try {
+      const snap = await API.get(`/api/zapret2/generator/status?since=${zapret2GeneratorLogCursor}`);
+      appendZapret2GeneratorLogLines(snap.log);
+      zapret2GeneratorLogCursor = snap.log_len;
+      updateZapret2GeneratorProgress(snap.progress);
+      if (!snap.running) {
+        clearInterval(zapret2GeneratorPollTimer);
+        setZapret2GeneratorRunningUI(false);
+        renderZapret2GeneratorSummary(snap);
+      }
+    } catch (e) { /* transient — keep polling */ }
+  }, 700);
+}
+
+async function stopZapret2Generator() {
+  try {
+    await API.post("/api/zapret2/generator/stop", {});
+  } catch (e) { /* ignore */ }
+}
+
+$("zapret2-run-generator").addEventListener("click", startZapret2Generator);
+$("zapret2-stop-generator").addEventListener("click", stopZapret2Generator);
 
 // ------------------------------------------------------------------ //
 // home <-> settings view switching
@@ -963,11 +1280,18 @@ $("clear-discord-cache").addEventListener("click", async () => {
 // ------------------------------------------------------------------ //
 
 (async function init() {
+  document.querySelectorAll("#engine-segmented button").forEach((b) => {
+    b.classList.toggle("active", b.dataset.value === currentEngine);
+  });
+
   await loadEnv();
   await loadServiceCatalog();
+  await loadZapret2GeneratorServiceCatalog();
   await loadScanSettings();
   await loadVersions();
   await loadStrategiesForAllTabs();
   pollWinwsStatus();
   setInterval(pollWinwsStatus, 2000);
+  await loadZapret2State();
+  setInterval(loadZapret2State, 3000);
 })();

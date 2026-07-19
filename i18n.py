@@ -152,6 +152,14 @@ MESSAGES = {
         "ru": "Вариант не найден — запустите подбор заново",
         "en": "Candidate not found — run the generator again",
     },
+    "err_zapret2_no_version": {
+        "ru": "Версия zapret2 не найдена — обновите список",
+        "en": "Zapret2 version not found — reload the list",
+    },
+    "err_zapret2_profile_not_found": {
+        "ru": "Профиль не найден — обновите список",
+        "en": "Profile not found — reload the list",
+    },
 
     # -- zapret_generator: log lines reaching the web UI ------------------------- #
     "gen_baseline_start": {

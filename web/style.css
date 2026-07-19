@@ -281,6 +281,25 @@ body {
 
 .connect-status.connected { color: var(--accent); }
 
+/* zapret2 (alternative engine) mode — same shapes, secondary accent color
+   so it's visually obvious which engine the circle currently controls. */
+.home-engine-switch { margin-bottom: 18px; }
+
+.zapret2-generator-block {
+  margin-top: 16px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--border);
+}
+
+.connect-circle.alt-engine.connected {
+  border-color: var(--accent-2);
+  color: var(--accent-2);
+  box-shadow: 0 0 0 10px rgba(95, 208, 255, 0.06), 0 0 50px rgba(95, 208, 255, 0.22);
+}
+.connect-circle.alt-engine::before,
+.connect-circle.alt-engine::after { border-color: var(--accent-2); }
+.connect-status.alt-engine.connected { color: var(--accent-2); }
+
 .connect-sub {
   color: var(--muted);
   font-size: 12.5px;
