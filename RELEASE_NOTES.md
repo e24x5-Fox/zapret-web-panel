@@ -1,3 +1,31 @@
+## zapret-web-panel v1.3.0
+
+Скачивание оригинальных релизов zapret прямо из панели, плюс пояснение по антивирусам.
+
+### Что нового
+- **Скачивание релизов внутри панели** — новый раздел "Скачать релизы": можно выбрать и скачать любой релиз [zapret-discord-youtube](https://github.com/Flowseal/zapret-discord-youtube) (с проверкой контрольной суммы sha256 против официального GitHub) или последнюю сборку [zapret-win-bundle](https://github.com/bol-van/zapret-win-bundle) для Zapret2 — без ручного скачивания и распаковки zip-архивов. Файлы попадают в папку `zapret/zapret1` и `zapret/zapret2` рядом с панелью и сразу появляются в списке версий.
+- **Пояснение по антивирусам** — в README и в самой панели добавлено объяснение, почему антивирусы иногда помечают `zapret-web-panel.exe` или файлы WinDivert/winws: это задокументированный ложноположительный паттерн для неподписанных PyInstaller-сборок и низкоуровневых сетевых драйверов, а не признак заражения.
+
+Подробности — в [README](https://github.com/e24x5-Fox/zapret-web-panel#readme).
+
+**Неофициальный, независимый компаньон-инструмент — не аффилирован с zapret-discord-youtube.**
+
+---
+
+## zapret-web-panel v1.3.0 (English)
+
+Download original zapret releases right from the panel, plus antivirus context.
+
+### What's new
+- **In-app release downloader** — a new "Download releases" section: pick and download any [zapret-discord-youtube](https://github.com/Flowseal/zapret-discord-youtube) release (verified against GitHub's own sha256 checksum) or the latest [zapret-win-bundle](https://github.com/bol-van/zapret-win-bundle) build for Zapret2 — no manual zip download/extraction needed. Files land in `zapret/zapret1` and `zapret/zapret2` next to the panel and show up in the version list immediately.
+- **Antivirus context** — the README and the panel itself now explain why antivirus software sometimes flags `zapret-web-panel.exe` or the WinDivert/winws files: a documented false-positive pattern for unsigned PyInstaller builds and low-level network drivers, not a sign of infection.
+
+See the [README](https://github.com/e24x5-Fox/zapret-web-panel#readme) for details.
+
+**Unofficial, independent companion tool — not affiliated with zapret-discord-youtube.**
+
+---
+
 ## zapret-web-panel v1.2.0
 
 Новый альтернативный движок и более честный тест на реальную блокировку DPI.

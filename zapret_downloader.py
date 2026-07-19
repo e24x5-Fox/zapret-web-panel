@@ -52,6 +52,16 @@ ZAPRET2_DIR = DOWNLOAD_ROOT / "zapret2"
 
 _USER_AGENT = "zapret-web-panel"
 
+# Explicitly bypass any system/environment proxy for these requests.
+# urllib.request.urlopen() auto-detects HTTP_PROXY/HTTPS_PROXY (env vars or,
+# on Windows, the registry-configured system proxy) by default — if that's
+# ever misconfigured (seen firsthand: a stray HTTPS_PROXY env var with a
+# trailing CR that broke curl.exe too), every GitHub call here would fail
+# with a confusing "no connection" error unrelated to the user's actual
+# internet access. This app has no reason to route its own GitHub API
+# calls through a system proxy it doesn't control.
+_opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
 
 # --------------------------------------------------------------------------- #
 # GitHub API
@@ -63,7 +73,7 @@ def _api_get(path: str, lang="ru"):
         headers={"User-Agent": _USER_AGENT, "Accept": "application/vnd.github+json"},
     )
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with _opener.open(req, timeout=15) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         if e.code == 403:
@@ -130,7 +140,7 @@ def _download_to_file(url: str, dest: Path, lang="ru") -> str:
     req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
     hasher = hashlib.sha256()
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp, open(dest, "wb") as f:
+        with _opener.open(req, timeout=30) as resp, open(dest, "wb") as f:
             while True:
                 chunk = resp.read(65536)
                 if not chunk:
