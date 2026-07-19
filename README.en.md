@@ -29,6 +29,12 @@ It replaces `service.bat`'s console menu and the bundled `test zapret.ps1` with 
 
 Download `zapret-web-panel.exe` from [Releases](../../releases) and place it next to your zapret version folders (or anywhere — point it at them with `ZAPRET_BASE_DIR`, see below).
 
+> **Antivirus flagging `zapret-web-panel.exe`, or the zapret/zapret2 files downloaded through the panel?** Expected, and usually a false positive rather than a sign of infection:
+> - `zapret-web-panel.exe` is a fresh, unsigned PyInstaller build. ML/heuristic engines (Microsoft's `!ml` suffix, CrowdStrike, SentinelOne Static AI, etc.) often can't tell a legitimate Python GUI tool packed into one exe apart from an actual Python infostealer packed the same way — hence generic verdicts like `Wacapew`, or occasionally a scarier-sounding family name from a smaller niche engine. Major reputable antivirus engines (Defender's classic signature engine, BitDefender, Avast, Kaspersky, etc.) are typically silent on it.
+> - `winws.exe`/`winws2.exe` and the `WinDivert` driver do low-level network traffic manipulation, which antivirus heuristics associate with hacking tools by behavior alone. WinDivert's own author states outright in [the documentation](https://reqrypt.org/windivert-doc.html) that the driver is a frequent antivirus target but not a virus.
+>
+> If in doubt, verify the downloaded file's SHA256 against the one GitHub itself publishes on the release (Assets → the checksum icon) rather than trusting a raw VirusTotal detection count.
+
 ### Option 2 — from source
 
 ```

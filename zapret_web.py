@@ -53,6 +53,7 @@ import zapret_service as zs
 import zapret_generator as zg
 import zapret2_engine as z2
 import zapret2_generator as zg2
+import zapret_downloader as zd
 from i18n import t
 
 def _resource_dir() -> Path:
@@ -405,6 +406,12 @@ class Handler(BaseHTTPRequestHandler):
                     "zapret_service_installed": zt.check_zapret_service_installed(),
                 })
 
+            if path == "/api/download/zapret1/releases":
+                return self._send_json({"releases": zd.list_zapret1_releases(lang)})
+
+            if path == "/api/download/zapret2/info":
+                return self._send_json(zd.zapret2_bundle_info(lang))
+
             if path.startswith("/api/"):
                 return self._send_error_json("not found", 404)
 
@@ -718,6 +725,30 @@ class Handler(BaseHTTPRequestHandler):
             _version_paths.pop(name, None)
         return self._send_json({"ok": True})
 
+    def _download_zapret1_start(self, data, lang):
+        tag = data.get("tag")
+        if not tag:
+            raise ValueError(t(lang, "err_version_not_specified"))
+        path = zd.download_zapret1(tag, lang)
+        _do_rescan(lang)
+        # A same-named release folder may already exist elsewhere on disk
+        # (this app's users tend to have old copies scattered around) — the
+        # whole-computer rescan's first-match-wins collision handling could
+        # otherwise silently point the just-downloaded name at that old
+        # copy instead. The one just fetched is what the user asked for,
+        # so it always wins the naming slot right after a download.
+        with _scan_lock:
+            _version_paths[path.name] = path
+        return self._send_json({"ok": True, "path": str(path), "name": path.name})
+
+    def _download_zapret2_start(self, data, lang):
+        path = zd.download_zapret2_bundle(lang)
+        _do_rescan_zapret2()
+        engine_dir = z2.find_engine_dir(path) or path
+        with _zapret2_scan_lock:
+            _zapret2_version_paths[path.name] = engine_dir
+        return self._send_json({"ok": True, "path": str(engine_dir), "name": path.name})
+
     _POST_ROUTES = {
         "/api/test/start": _test_start,
         "/api/test/stop": _test_stop,
@@ -748,6 +779,8 @@ class Handler(BaseHTTPRequestHandler):
         "/api/scan/pick_folder": _scan_pick_folder,
         "/api/open_folder": _open_folder,
         "/api/delete_folder": _delete_folder,
+        "/api/download/zapret1/start": _download_zapret1_start,
+        "/api/download/zapret2/start": _download_zapret2_start,
     }
 
     # -- static files -------------------------------------------------- #

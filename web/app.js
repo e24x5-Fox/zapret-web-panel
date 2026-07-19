@@ -1027,6 +1027,94 @@ $("zapret2-run-generator").addEventListener("click", startZapret2Generator);
 $("zapret2-stop-generator").addEventListener("click", stopZapret2Generator);
 
 // ------------------------------------------------------------------ //
+// Скачать релизы — pulls versioned zapret1 releases and the rolling
+// zapret2-win-bundle snapshot straight from GitHub into ./zapret/{zapret1,
+// zapret2} next to the panel, then refreshes the existing version lists so
+// a freshly downloaded copy shows up without a manual rescan.
+// ------------------------------------------------------------------ //
+
+let downloadPanelLoaded = false;
+let zapret1Releases = [];
+
+function formatReleaseDate(iso) {
+  if (!iso) return "";
+  return iso.slice(0, 10);
+}
+
+async function loadDownloadZapret1Releases() {
+  const sel = $("download-zapret1-select");
+  try {
+    const { releases } = await API.get("/api/download/zapret1/releases");
+    zapret1Releases = releases;
+    sel.innerHTML = releases.map((r) => {
+      const label = `${r.tag} — ${formatReleaseDate(r.published_at)}${r.prerelease ? " (pre)" : ""}`;
+      return `<option value="${escapeHtml(r.tag)}">${escapeHtml(label)}</option>`;
+    }).join("");
+  } catch (e) {
+    toast(t("err_download_releases_failed"), "error");
+  }
+}
+
+async function loadDownloadZapret2Info() {
+  const el = $("download-zapret2-info");
+  try {
+    const info = await API.get("/api/download/zapret2/info");
+    el.textContent = t("zapret2_bundle_info_text", { sha: info.short_sha, date: formatReleaseDate(info.date) });
+  } catch (e) {
+    el.textContent = t("label_error_prefix", { message: e.message });
+  }
+}
+
+$("download-zapret1-reload").addEventListener("click", loadDownloadZapret1Releases);
+
+$("download-zapret1-start").addEventListener("click", async () => {
+  const tag = $("download-zapret1-select").value;
+  if (!tag) return toast(t("err_download_no_release_selected"), "error");
+  const btn = $("download-zapret1-start");
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = t("msg_downloading");
+  logService(t("log_download_start", { name: tag }));
+  try {
+    const res = await API.post("/api/download/zapret1/start", { tag });
+    logService(t("log_download_done", { name: res.name, path: res.path }));
+    toast(t("log_download_done", { name: res.name, path: res.path }), "info");
+    await loadVersions();
+  } catch (e) {
+    logService(t("label_error_prefix", { message: e.message }));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+});
+
+$("download-zapret2-start").addEventListener("click", async () => {
+  const btn = $("download-zapret2-start");
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = t("msg_downloading");
+  logService(t("log_download_start", { name: "zapret-win-bundle" }));
+  try {
+    const res = await API.post("/api/download/zapret2/start", {});
+    logService(t("log_download_done", { name: res.name, path: res.path }));
+    toast(t("log_download_done", { name: res.name, path: res.path }), "info");
+    await loadZapret2Versions(true);
+  } catch (e) {
+    logService(t("label_error_prefix", { message: e.message }));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+});
+
+document.querySelector('.menu-item[data-target="panel-download"]').addEventListener("click", () => {
+  if (downloadPanelLoaded) return;
+  downloadPanelLoaded = true;
+  loadDownloadZapret1Releases();
+  loadDownloadZapret2Info();
+});
+
+// ------------------------------------------------------------------ //
 // home <-> settings view switching
 // ------------------------------------------------------------------ //
 

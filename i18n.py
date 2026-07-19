@@ -64,6 +64,29 @@ MESSAGES = {
     "hosts_up_to_date": {"ru": "Файл hosts в актуальном состоянии.", "en": "The hosts file is up to date."},
     "version_fetch_failed": {"ru": "Не удалось получить версию с GitHub.", "en": "Failed to fetch the version from GitHub."},
 
+    # -- zapret_downloader ------------------------------------------------ #
+    "err_download_network": {
+        "ru": "Не удалось связаться с GitHub. Проверьте подключение к интернету.",
+        "en": "Couldn't reach GitHub. Check your internet connection.",
+    },
+    "err_download_rate_limited": {
+        "ru": "GitHub временно ограничил количество запросов с этого адреса. Попробуйте позже.",
+        "en": "GitHub is temporarily rate-limiting requests from this address. Try again later.",
+    },
+    "err_download_not_found": {"ru": "Релиз не найден на GitHub.", "en": "Release not found on GitHub."},
+    "err_download_no_asset": {
+        "ru": "В этом релизе нет zip-архива для скачивания.",
+        "en": "This release has no zip archive to download.",
+    },
+    "err_download_hash_mismatch": {
+        "ru": "Скачанный файл не совпадает с официальной контрольной суммой GitHub — загрузка отменена.",
+        "en": "The downloaded file doesn't match GitHub's published checksum — download cancelled.",
+    },
+    "err_download_already_exists": {
+        "ru": "Папка {name} уже скачана.",
+        "en": "{name} has already been downloaded.",
+    },
+
     # -- zapret_service: run_diagnostics — check names ------------------- #
     "name_bfe": {"ru": "Base Filtering Engine", "en": "Base Filtering Engine"},
     "name_proxy": {"ru": "Системный прокси", "en": "System proxy"},
