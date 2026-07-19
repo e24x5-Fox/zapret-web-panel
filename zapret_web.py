@@ -14,8 +14,11 @@ import secrets
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
+import urllib.request
 import webbrowser
+import winreg
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -839,10 +842,92 @@ def _relaunch_as_admin():
     sys.exit(0)
 
 
+# Windows 11 ships WebView2 Runtime built in; Windows 10 doesn't, so on a
+# fresh Windows 10 machine the "real app window" path below silently falls
+# back to opening a browser tab instead — confirmed the hard way by a
+# tester whose stray Ctrl+P triggered a broken-looking WebView2 print
+# overlay, which turned out to only be reachable if WebView2 is present at
+# all (i.e. their box already had *some* copy of it). Proactively installing
+# it here means the fallback essentially never triggers on a normal
+# Windows 10 install instead of silently degrading to browser mode.
+_WEBVIEW2_CLIENT_GUID = "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+_WEBVIEW2_BOOTSTRAPPER_URL = "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
+
+
+def _webview2_installed() -> bool:
+    """Checks the same registry keys Microsoft's own detection guidance
+    uses — machine-wide (32- and 64-bit view) and per-user WebView2
+    Runtime installs all register an EdgeUpdate client key with a
+    non-empty product version ('pv')."""
+    key_paths = [
+        (winreg.HKEY_LOCAL_MACHINE, rf"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{_WEBVIEW2_CLIENT_GUID}"),
+        (winreg.HKEY_LOCAL_MACHINE, rf"SOFTWARE\Microsoft\EdgeUpdate\Clients\{_WEBVIEW2_CLIENT_GUID}"),
+        (winreg.HKEY_CURRENT_USER, rf"SOFTWARE\Microsoft\EdgeUpdate\Clients\{_WEBVIEW2_CLIENT_GUID}"),
+    ]
+    for hive, path in key_paths:
+        try:
+            with winreg.OpenKey(hive, path) as key:
+                value, _ = winreg.QueryValueEx(key, "pv")
+            if value:
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def _install_webview2_runtime() -> bool:
+    """Downloads and silently runs Microsoft's official WebView2 Runtime
+    Evergreen Bootstrapper (the same small installer Microsoft's own docs
+    point third-party apps at for exactly this). Returns True on apparent
+    success. Explicitly bypasses any system/env proxy, same reasoning as
+    zapret_downloader — this shouldn't fail just because of an unrelated
+    misconfigured proxy."""
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    try:
+        tmp_path = Path(tempfile.gettempdir()) / "MicrosoftEdgeWebView2Setup.exe"
+        req = urllib.request.Request(_WEBVIEW2_BOOTSTRAPPER_URL, headers={"User-Agent": "zapret-web-panel"})
+        with opener.open(req, timeout=120) as resp, open(tmp_path, "wb") as f:
+            while True:
+                chunk = resp.read(65536)
+                if not chunk:
+                    break
+                f.write(chunk)
+        res = subprocess.run([str(tmp_path), "/silent", "/install"], timeout=300)
+        return res.returncode == 0
+    except Exception:
+        return False
+
+
+def _ensure_webview2_runtime():
+    if _webview2_installed():
+        return
+    ctypes.windll.user32.MessageBoxW(
+        None,
+        "Компонент WebView2 Runtime не найден и будет автоматически установлен "
+        "(нужен интернет, может занять до минуты).\n\n"
+        "The WebView2 Runtime component wasn't found and will be installed "
+        "automatically (needs an internet connection, may take up to a minute).",
+        "Zapret Control Panel",
+        0x40,  # MB_ICONINFORMATION
+    )
+    if not _install_webview2_runtime():
+        ctypes.windll.user32.MessageBoxW(
+            None,
+            "Не удалось установить WebView2 Runtime — панель откроется в браузере "
+            "вместо отдельного окна.\n\n"
+            "Couldn't install the WebView2 Runtime — the panel will open in your "
+            "browser instead of its own window.",
+            "Zapret Control Panel",
+            0x30,  # MB_ICONWARNING
+        )
+
+
 def main():
     if not zt.is_admin():
         _relaunch_as_admin()
         return
+
+    _ensure_webview2_runtime()
 
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -850,10 +935,10 @@ def main():
     url = f"http://127.0.0.1:{PORT}/"
 
     # Normal path: a real app window (no browser chrome, no console) via
-    # pywebview, wrapping the WebView2 runtime that ships with Windows
-    # 10/11. Falls back to opening the system browser only if that's
-    # unavailable for some reason (e.g. WebView2 runtime missing) — the
-    # panel still works, just as a browser tab instead of a window.
+    # pywebview, wrapping WebView2 (auto-installed above if missing). Falls
+    # back to opening the system browser only if that install didn't work
+    # out (e.g. no internet) — the panel still works, just as a browser tab
+    # instead of a window.
     try:
         import webview
         webview.create_window(
