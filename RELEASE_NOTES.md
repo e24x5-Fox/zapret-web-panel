@@ -1,3 +1,21 @@
+## zapret-web-panel v1.8.0
+
+Исправлена пустая панель с ошибкой "forbidden" у части пользователей.
+
+### Что нового
+- На некоторых машинах (другая версия WebView2 Runtime) окно панели вместо интерфейса показывало `{"error": "forbidden"}` — сервер панели проверял заголовок `Host` слишком строго (только `127.0.0.1:8756`), а WebView2 у части пользователей обращался как `localhost:8756`. Теперь принимаются оба варианта. Заодно это объясняет, почему у таких пользователей не срабатывал фикс случайной печати из v1.6.0 — сама страница просто не успевала загрузиться.
+
+---
+
+## zapret-web-panel v1.8.0 (English)
+
+Fixed a blank "forbidden" panel some users hit.
+
+### What's new
+- On some machines (a different WebView2 Runtime build) the panel window showed a raw `{"error": "forbidden"}` instead of the UI — the panel's server checked the `Host` header too strictly (only `127.0.0.1:8756`), while WebView2 sent `localhost:8756` for some users. Both are now accepted. This also explains why the accidental-printing fix from v1.6.0 didn't seem to help those users — the page itself was never actually loading.
+
+---
+
 ## zapret-web-panel v1.7.0
 
 Автоустановка WebView2 Runtime на Windows 10.
