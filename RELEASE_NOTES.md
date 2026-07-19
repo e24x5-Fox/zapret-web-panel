@@ -1,3 +1,21 @@
+## zapret-web-panel v1.6.0
+
+Исправлена случайная печать поверх окна панели.
+
+### Что нового
+- Заблокированы браузерные горячие клавиши (Ctrl+P/F/R, F5, F12), которые не нужны в оконном приложении — у одного из тестировщиков случайное нажатие Ctrl+P открывало сломанную панель предпросмотра печати WebView2 поверх интерфейса.
+
+---
+
+## zapret-web-panel v1.6.0 (English)
+
+Fixed accidental printing appearing over the panel window.
+
+### What's new
+- Blocked browser keyboard shortcuts (Ctrl+P/F/R, F5, F12) that serve no purpose in a windowed app — a tester hit Ctrl+P by accident and got WebView2's own (broken-rendering) print-preview toolbar over the interface.
+
+---
+
 ## zapret-web-panel v1.5.0
 
 Необязательная ссылка на поддержку проекта.
