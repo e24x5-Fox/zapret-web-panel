@@ -168,6 +168,7 @@ MESSAGES = {
     "err_unknown_version": {"ru": "Неизвестная версия: {name}", "en": "Unknown version: {name}"},
     "err_strategy_not_found": {"ru": "Стратегия не найдена: {strategy}", "en": "Strategy not found: {strategy}"},
     "err_bad_scan_mode": {"ru": "Неизвестный режим поиска версий", "en": "Unknown version scan mode"},
+    "err_bad_list_name": {"ru": "Неизвестный список", "en": "Unknown list"},
     "err_no_custom_dir": {"ru": "Папка не выбрана", "en": "No folder chosen"},
     "err_generator_already_running": {"ru": "Подбор стратегии уже выполняется", "en": "A generator run is already in progress"},
     "err_bad_generator_mode": {"ru": "Неизвестный режим подбора стратегии", "en": "Unknown generator mode"},

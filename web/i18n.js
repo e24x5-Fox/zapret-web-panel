@@ -211,6 +211,16 @@ const I18N = {
     zapret2_bundle_info_text: "Текущий снимок master-ветки: {sha} от {date}",
     err_download_releases_failed: "Не удалось получить список релизов",
     err_download_no_release_selected: "Выберите релиз",
+
+    menu_cat_lists: "DOMAINS & IP",
+    menu_lists: "Домены и IP",
+    lists_desc: "Эти списки применяют все стратегии general*.bat у выбранной версии одинаково. Формат — один домен или IP/подсеть (CIDR) на строку, \"#\" — комментарий.",
+    lists_general_label: "Добавить домены (zapret точно будет их обходить)",
+    lists_exclude_label: "Исключить домены (zapret их не тронет)",
+    lists_ipset_exclude_label: "Исключить IP/подсети (zapret их не тронет)",
+    btn_save: "Сохранить",
+    msg_list_saved: "Сохранено",
+    err_lists_no_version: "Выберите версию",
   },
 
   en: {
@@ -423,6 +433,16 @@ const I18N = {
     zapret2_bundle_info_text: "Current master branch snapshot: {sha} from {date}",
     err_download_releases_failed: "Failed to fetch the release list",
     err_download_no_release_selected: "Choose a release",
+
+    menu_cat_lists: "DOMAINS & IP",
+    menu_lists: "Domains & IP",
+    lists_desc: "These lists are used by every general*.bat strategy of the selected version, the same way. Format — one domain or IP/subnet (CIDR) per line, \"#\" for a comment.",
+    lists_general_label: "Add domains (zapret will always bypass these)",
+    lists_exclude_label: "Exclude domains (zapret leaves these alone)",
+    lists_ipset_exclude_label: "Exclude IPs/subnets (zapret leaves these alone)",
+    btn_save: "Save",
+    msg_list_saved: "Saved",
+    err_lists_no_version: "Choose a version",
   },
 };
 

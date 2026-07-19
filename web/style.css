@@ -694,6 +694,15 @@ select:focus, input[type="text"]:focus {
   letter-spacing: 0.4px;
 }
 
+#panel-lists label {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-top: 12px;
+}
+
 /* ---------------------------------------------------------------- */
 /* run-tests panel                                                     */
 /* ---------------------------------------------------------------- */
@@ -797,6 +806,26 @@ select:focus, input[type="text"]:focus {
   overflow-y: auto;
   white-space: pre-wrap;
   margin: 10px 0;
+}
+
+.list-textarea {
+  width: 100%;
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: #a9c9b4;
+  height: 110px;
+  resize: vertical;
+  margin: 6px 0 10px;
+  box-sizing: border-box;
+}
+
+.list-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 .summary-list {

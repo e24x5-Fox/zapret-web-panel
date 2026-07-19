@@ -399,6 +399,10 @@ class Handler(BaseHTTPRequestHandler):
                     "check_updates": zs.check_updates_enabled(vd),
                 })
 
+            if path == "/api/service/lists":
+                vd = _version_dir(qs.get("version", [None])[0], lang)
+                return self._send_json(zs.read_user_lists(vd))
+
             if path == "/api/env":
                 return self._send_json({
                     "admin": zt.is_admin(),
@@ -665,6 +669,11 @@ class Handler(BaseHTTPRequestHandler):
         zs.set_check_updates_enabled(vd, bool(data.get("enabled")))
         return self._send_json({"ok": True})
 
+    def _service_lists_save(self, data, lang):
+        vd = _version_dir(data["version"], lang)
+        zs.write_user_list(vd, data["key"], data.get("content", ""), lang)
+        return self._send_json({"ok": True})
+
     def _update_ipset(self, data, lang):
         vd = _version_dir(data["version"], lang)
         return self._send_json({"ok": True, "output": zs.update_ipset_list(vd, lang)})
@@ -767,6 +776,7 @@ class Handler(BaseHTTPRequestHandler):
         "/api/service/settings/game_filter": _settings_game_filter,
         "/api/service/settings/ipset_cycle": _settings_ipset_cycle,
         "/api/service/settings/check_updates": _settings_check_updates,
+        "/api/service/lists/save": _service_lists_save,
         "/api/service/update/ipset": _update_ipset,
         "/api/service/update/hosts": _update_hosts,
         "/api/service/update/check": _update_check,

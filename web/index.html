@@ -357,6 +357,33 @@
           </div>
         </div></div>
 
+        <div class="menu-cat" data-i18n="menu_cat_lists">DOMAINS &amp; IP</div>
+
+        <div class="menu-item" data-target="panel-lists">
+          <span class="menu-num">15.</span><span class="menu-label" data-i18n="menu_lists">Домены и IP</span>
+        </div>
+        <div class="menu-panel" id="panel-lists"><div class="menu-panel-inner">
+          <p class="muted" data-i18n="lists_desc">Эти списки применяют все стратегии general*.bat у выбранной версии одинаково. Формат — один домен или IP/подсеть (CIDR) на строку, "#" — комментарий.</p>
+
+          <label data-i18n="lists_general_label">Добавить домены (zapret точно будет их обходить)</label>
+          <textarea id="lists-general" class="list-textarea" spellcheck="false"></textarea>
+          <div class="btn-row">
+            <button class="btn btn-primary btn-small" data-save-list="general" data-i18n="btn_save">Сохранить</button>
+          </div>
+
+          <label data-i18n="lists_exclude_label">Исключить домены (zapret их не тронет)</label>
+          <textarea id="lists-exclude" class="list-textarea" spellcheck="false"></textarea>
+          <div class="btn-row">
+            <button class="btn btn-primary btn-small" data-save-list="exclude" data-i18n="btn_save">Сохранить</button>
+          </div>
+
+          <label data-i18n="lists_ipset_exclude_label">Исключить IP/подсети (zapret их не тронет)</label>
+          <textarea id="lists-ipset_exclude" class="list-textarea" spellcheck="false"></textarea>
+          <div class="btn-row">
+            <button class="btn btn-primary btn-small" data-save-list="ipset_exclude" data-i18n="btn_save">Сохранить</button>
+          </div>
+        </div></div>
+
       </div>
 
       <div class="console-wrap">

@@ -318,6 +318,49 @@ def update_ipset_list(version_dir: Path, lang="ru") -> str:
     return t(lang, "ipset_updated", size=list_file.stat().st_size)
 
 
+# --------------------------------------------------------------------------- #
+# user domain/IP lists (list-general-user.txt, list-exclude-user.txt,
+# ipset-exclude-user.txt) — every general*.bat strategy in a version reads
+# these the same way (--hostlist/--hostlist-exclude/--ipset-exclude), so
+# editing them here affects every strategy of that version uniformly.
+# service.bat only ever scaffolds these with a placeholder on first run
+# (see its own menu init) — there's no console-menu way to edit them, you're
+# expected to open the .txt files by hand. This is that editor.
+# --------------------------------------------------------------------------- #
+
+USER_LISTS = {
+    "general": ("list-general-user.txt", "# Never leave this file empty\ndomain.example.abc\n"),
+    "exclude": ("list-exclude-user.txt", "domain.example.abc\n"),
+    "ipset_exclude": ("ipset-exclude-user.txt", "203.0.113.113/32\n"),
+}
+
+
+def _user_list_path(version_dir: Path, key: str) -> Path:
+    filename, _ = USER_LISTS[key]
+    return version_dir / "lists" / filename
+
+
+def read_user_lists(version_dir: Path) -> dict:
+    out = {}
+    for key, (_, default) in USER_LISTS.items():
+        f = _user_list_path(version_dir, key)
+        if not f.exists():
+            f.parent.mkdir(exist_ok=True)
+            f.write_text(default, encoding="utf-8")
+        out[key] = f.read_text(encoding="utf-8", errors="ignore")
+    return out
+
+
+def write_user_list(version_dir: Path, key: str, content: str, lang="ru"):
+    if key not in USER_LISTS:
+        raise ValueError(t(lang, "err_bad_list_name"))
+    f = _user_list_path(version_dir, key)
+    f.parent.mkdir(exist_ok=True)
+    if not content.endswith("\n"):
+        content += "\n"
+    f.write_text(content, encoding="utf-8")
+
+
 def check_hosts_file(lang="ru") -> str:
     hosts_path = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "drivers" / "etc" / "hosts"
     tmp = Path(os.environ.get("TEMP", ".")) / "zapret_hosts.txt"

@@ -1115,6 +1115,47 @@ document.querySelector('.menu-item[data-target="panel-download"]').addEventListe
 });
 
 // ------------------------------------------------------------------ //
+// Домены и IP — editor for list-general-user.txt / list-exclude-user.txt /
+// ipset-exclude-user.txt, the three per-version files every general*.bat
+// strategy reads the same way. Re-loaded every time the panel is opened
+// (not just once) since the selected version can change between visits.
+// ------------------------------------------------------------------ //
+
+const LIST_TEXTAREA_IDS = { general: "lists-general", exclude: "lists-exclude", ipset_exclude: "lists-ipset_exclude" };
+
+async function loadLists() {
+  if (!state.version) return;
+  try {
+    const lists = await API.get(`/api/service/lists?version=${encodeURIComponent(state.version)}`);
+    for (const [key, id] of Object.entries(LIST_TEXTAREA_IDS)) {
+      $(id).value = lists[key] || "";
+    }
+  } catch (e) {
+    logService(t("label_error_prefix", { message: e.message }));
+  }
+}
+
+document.querySelectorAll("[data-save-list]").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    const key = btn.dataset.saveList;
+    if (!state.version) return toast(t("err_lists_no_version"), "error");
+    const original = btn.textContent;
+    btn.disabled = true;
+    try {
+      await API.post("/api/service/lists/save", { version: state.version, key, content: $(LIST_TEXTAREA_IDS[key]).value });
+      toast(t("msg_list_saved"), "info");
+    } catch (e) {
+      logService(t("label_error_prefix", { message: e.message }));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  });
+});
+
+document.querySelector('.menu-item[data-target="panel-lists"]').addEventListener("click", loadLists);
+
+// ------------------------------------------------------------------ //
 // home <-> settings view switching
 // ------------------------------------------------------------------ //
 
