@@ -1,5 +1,23 @@
 "use strict";
 
+// This is a native-feeling app window (pywebview/WebView2), but it's still
+// a full browser underneath — nothing here disables the default browser
+// keyboard shortcuts, so a stray Ctrl+P has been observed popping WebView2's
+// own print-preview UI (which then renders broken, black) over the app.
+// None of these shortcuts do anything useful in this app, so block them
+// outright rather than relying on WebView2's debug-gated accelerator-key
+// setting to already be off.
+window.print = () => {};
+document.addEventListener("keydown", (e) => {
+  const key = e.key.toLowerCase();
+  if (e.ctrlKey && (key === "p" || key === "f" || key === "r")) {
+    e.preventDefault();
+  }
+  if (key === "f5" || key === "f12") {
+    e.preventDefault();
+  }
+});
+
 const API = {
   async get(path) {
     const res = await fetch(path, {

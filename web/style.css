@@ -1108,3 +1108,10 @@ select:focus, input[type="text"]:focus {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--faint); }
+
+/* Backstop for the print-preview glitch (see app.js) — if WebView2's print
+   UI ever triggers despite the JS guard, print a blank page instead of
+   whatever broken render it would otherwise produce. */
+@media print {
+  body { display: none !important; }
+}
