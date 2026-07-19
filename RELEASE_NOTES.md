@@ -1,3 +1,31 @@
+## zapret-web-panel v1.2.0
+
+Новый альтернативный движок и более честный тест на реальную блокировку DPI.
+
+### Что нового
+- **Zapret2 как альтернативный движок** — поддержка [bol-van/zapret2](https://github.com/bol-van/zapret2) (`winws2.exe`) прямо в панели, полностью отдельно от обычного zapret: переключатель Zapret/Zapret2 на главном экране, поиск версий по всему компьютеру, запуск/остановка профилей, свой генератор стратегий (перебор комбинаций lua-desync методов). Экспериментальная, необязательная функция — основной обход по-прежнему работает через обычный zapret.
+- **Более честная проверка "работает/не работает"** — тест теперь реально загружает ~64КБ данных и проверяет, не обрывается ли соединение на полпути (типичное поведение DPI, которое пропускает первые ~16-20КБ трафика, а потом рвёт соединение). Старая проверка (простой HEAD-запрос) могла показывать "всё работает", даже когда реальная блокировка активна.
+
+Подробности — в [README](https://github.com/e24x5-Fox/zapret-web-panel#readme).
+
+**Неофициальный, независимый компаньон-инструмент — не аффилирован с zapret-discord-youtube.**
+
+---
+
+## zapret-web-panel v1.2.0 (English)
+
+A new alternative engine, plus a more honest real-world DPI block test.
+
+### What's new
+- **Zapret2 as an alternative engine** — support for [bol-van/zapret2](https://github.com/bol-van/zapret2) (`winws2.exe`) right in the panel, fully separate from the regular zapret flow: a Zapret/Zapret2 toggle on the home screen, whole-computer version scan, profile launch/stop, and its own strategy generator (searches combinations of lua-desync methods). Experimental, opt-in — the regular zapret path is still the primary bypass method.
+- **A more honest working/not-working check** — the test now actually uploads ~64KB of data and checks whether the connection gets cut mid-stream (the typical behavior of DPI that lets the first ~16-20KB of traffic through, then kills the connection). The old check (a plain HEAD request) could report "everything works" even while real blocking was active.
+
+See the [README](https://github.com/e24x5-Fox/zapret-web-panel#readme) for details.
+
+**Unofficial, independent companion tool — not affiliated with zapret-discord-youtube.**
+
+---
+
 ## zapret-web-panel v1.1.1
 
 Исправления после v1.1.0:
