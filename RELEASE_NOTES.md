@@ -1,3 +1,25 @@
+## zapret-web-panel v1.9.0
+
+Автопроверка обновлений стала общей настройкой, приложение уменьшилось в размере, добавлена облегчённая сборка.
+
+### Что нового
+- Настройка «Автопроверка обновлений» (Служба → пункт 6) больше не привязана к конкретной установленной версии zapret. Раньше при переключении на другую версию (или после её обновления/переустановки) переключатель незаметно сбрасывался в «выключено»; теперь это единая настройка панели, которая сама применяется к любой активной версии.
+- `zapret-web-panel.exe` стал заметно легче (~15 МБ вместо ~23 МБ) — сборка теперь собирается в отдельном чистом окружении, а не в общем Python-окружении разработчика, куда со временем попали посторонние библиотеки от других проектов.
+- Добавлена дополнительная сборка `zapret-web-panel-lite.exe` (~13 МБ) — тот же самый апп, но плотнее упакован (UPX-сжатие + отказ от пары неиспользуемых модулей). **Важно**: UPX-сжатие — известный триггер ложных срабатываний антивирусов и Windows Defender. Берите `-lite` версию только если размер файла принципиален; для обычного использования рекомендуется `zapret-web-panel.exe`.
+
+---
+
+## zapret-web-panel v1.9.0 (English)
+
+The auto-update-check toggle is now a global setting, the app got smaller, and there's an optional lighter build.
+
+### What's new
+- The "Check for updates" toggle (Service tab, item 6) is no longer tied to a specific installed zapret version. It used to silently reset to "off" whenever you switched to a different version (or reinstalled/updated one) — it's now a single panel-wide setting that automatically applies itself to whichever version is active.
+- `zapret-web-panel.exe` is noticeably smaller now (~15MB, down from ~23MB) — it's built from a dedicated clean environment instead of the developer's general-purpose Python setup, which had accumulated unrelated libraries from other projects over time.
+- Added an extra `zapret-web-panel-lite.exe` build (~13MB) — the same app, packed tighter (UPX compression plus dropping a couple of genuinely-unused modules). **Note**: UPX compression is a well-known trigger for antivirus/Windows Defender false positives. Only grab the `-lite` build if file size specifically matters to you; `zapret-web-panel.exe` is the recommended default for everyday use.
+
+---
+
 ## zapret-web-panel v1.8.0
 
 Исправлена пустая панель с ошибкой "forbidden" у части пользователей.
