@@ -318,8 +318,21 @@ class Handler(BaseHTTPRequestHandler):
         return json.loads(raw.decode("utf-8")) if raw else {}
 
     def _host_ok(self) -> bool:
-        host, _, port = self.headers.get("Host", "").rpartition(":")
-        return host.lower() in _LOOPBACK_HOSTNAMES and port == str(PORT)
+        header = self.headers.get("Host", "")
+        host, sep, port = header.rpartition(":")
+        if not sep:
+            # No ":" at all (e.g. some local security-suite/proxy layer
+            # rewrites "Host: 127.0.0.1:8756" down to a bare "Host:
+            # localhost"): str.rpartition() with no match puts the whole
+            # header in `port` and leaves `host` empty, which used to reject
+            # every one of these as forbidden. The connection already landed
+            # on our own PORT-only listening socket, so the bare hostname is
+            # enough on its own.
+            host, port = port, str(PORT)
+        ok = host.lower() in _LOOPBACK_HOSTNAMES and port == str(PORT)
+        if not ok:
+            print(f"[host-check] rejected Host header: {header!r}", file=sys.stderr)
+        return ok
 
     def _token_ok(self) -> bool:
         return secrets.compare_digest(self.headers.get("X-Zapret-Token", ""), SECRET_TOKEN)
