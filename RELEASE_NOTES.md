@@ -1,3 +1,21 @@
+## zapret-web-panel v1.9.1
+
+Ещё один случай ложного "forbidden" в окне панели.
+
+### Что нового
+- У части пользователей окно панели по-прежнему могло показывать `{"error": "forbidden"}` вместо интерфейса даже после фикса из v1.8.0 — если что-то на компьютере (например, локальный HTTP-фильтр антивируса) обрезает у заголовка `Host` номер порта, оставляя голое `localhost` без `:8756`, панель ошибочно считала такой запрос подозрительным. Теперь такой заголовок тоже принимается — реальную защиту от посторонних сайтов по-прежнему обеспечивает отдельный секретный токен, а не строгость разбора этого заголовка.
+
+---
+
+## zapret-web-panel v1.9.1 (English)
+
+Another case of a false "forbidden" panel window.
+
+### What's new
+- Some users could still see `{"error": "forbidden"}` instead of the panel UI even after the v1.8.0 fix — if something on the machine (e.g. a local antivirus HTTP filter) strips the port off the `Host` header, leaving a bare `localhost` with no `:8756`, the panel wrongly treated that as suspicious. That header shape is now accepted too — the actual defense against outside websites is a separate secret token, not how strictly this header gets parsed.
+
+---
+
 ## zapret-web-panel v1.9.0
 
 Автопроверка обновлений стала общей настройкой, приложение уменьшилось в размере, добавлена облегчённая сборка.
