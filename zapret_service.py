@@ -10,15 +10,30 @@ that as the 'zapret' service. This sidesteps re-implementing service.bat's
 own fragile %VAR% / quoting parser.
 """
 
+import json
 import os
 import re
 import shutil
 import subprocess
+import sys
 import time
 import winreg
 from pathlib import Path
 
 from i18n import t
+
+
+def _app_dir() -> Path:
+    """Folder the app 'lives in': next to the running .exe when packaged,
+    or this script's own folder when running from source. Mirrors
+    zapret_tester._app_dir() — kept local so this module stays a
+    self-contained reimplementation of service.bat."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
+_APP_DIR = _app_dir()
 
 IPSET_URL = "https://raw.githubusercontent.com/Flowseal/zapret-discord-youtube/refs/heads/main/.service/ipset-service.txt"
 HOSTS_URL = "https://raw.githubusercontent.com/Flowseal/zapret-discord-youtube/refs/heads/main/.service/hosts"
@@ -253,11 +268,54 @@ def set_game_filter(version_dir: Path, mode: str):
     f.write_text(mode + "\n", encoding="utf-8")
 
 
+# Panel-level preference, stored next to the app itself rather than inside
+# any single zapret version's folder — so it survives switching between
+# versions or installing a new one, instead of resetting to "off" every
+# time (each version folder used to carry its own independent marker file).
+CHECK_UPDATES_PREF_FILE = _APP_DIR / "check_updates_pref.json"
+
+
+def load_check_updates_pref():
+    """Returns the saved global preference, or None if nothing was saved yet."""
+    if CHECK_UPDATES_PREF_FILE.exists():
+        try:
+            data = json.loads(CHECK_UPDATES_PREF_FILE.read_text(encoding="utf-8"))
+            return bool(data["enabled"])
+        except Exception:
+            pass
+    return None
+
+
+def save_check_updates_pref(enabled: bool):
+    CHECK_UPDATES_PREF_FILE.write_text(
+        json.dumps({"enabled": enabled}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
 def check_updates_enabled(version_dir: Path) -> bool:
-    return (version_dir / "utils" / "check_updates.enabled").exists()
+    """Per-version marker state, kept in sync with the global preference:
+    if a preference is already saved, the version's own marker file is
+    brought in line with it (fixing up any version that doesn't match yet
+    — e.g. one just installed, or one that was toggled before this synced
+    behavior existed). The first time this runs with no preference saved,
+    the version's current marker state seeds the global preference."""
+    current = (version_dir / "utils" / "check_updates.enabled").exists()
+    pref = load_check_updates_pref()
+    if pref is None:
+        save_check_updates_pref(current)
+        return current
+    if pref != current:
+        _write_check_updates_marker(version_dir, pref)
+    return pref
 
 
 def set_check_updates_enabled(version_dir: Path, enabled: bool):
+    _write_check_updates_marker(version_dir, enabled)
+    save_check_updates_pref(enabled)
+
+
+def _write_check_updates_marker(version_dir: Path, enabled: bool):
     f = version_dir / "utils" / "check_updates.enabled"
     if enabled:
         f.parent.mkdir(exist_ok=True)

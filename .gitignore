@@ -3,9 +3,12 @@ __pycache__/
 test_results/
 targets.json
 scan_settings.json
+check_updates_pref.json
 build/
 dist/
+.venv-build/
 zapret2-bundle/
 zapret2-master/
 zapret2-v1.0.2-release-UNSAFE/
 /zapret/
+zapret-web-panel-debug.spec
