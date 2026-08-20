@@ -401,6 +401,12 @@ def save_candidate(version_dir: Path, texts: dict, candidate_name: str, save_as:
     if candidate_name not in texts:
         raise ValueError(f"unknown candidate: {candidate_name}")
     safe_name = save_as if save_as.lower().endswith(".bat") else f"{save_as}.bat"
+    # Strip any directory part before joining: save_as arrives from the
+    # client, and both "../../evil.bat" and an absolute "C:/evil.bat" would
+    # otherwise write outside version_dir.
+    safe_name = Path(safe_name).name
+    if not safe_name or safe_name == ".bat":
+        raise ValueError(f"bad file name: {save_as}")
     out_path = version_dir / safe_name
     out_path.write_text(texts[candidate_name], encoding="utf-8")
     return out_path

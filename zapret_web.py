@@ -236,6 +236,11 @@ zapret2_generator_session = GeneratorSession()
 # lookup by name goes through this cache instead of assuming BASE_DIR/name.
 # --------------------------------------------------------------------------- #
 
+# Ceiling on a request body. Generous next to the largest legitimate one
+# (a user-list save), and it closes off trivial memory exhaustion via a
+# forged Content-Length, which the read below would otherwise honour.
+_MAX_BODY_BYTES = 10 * 1024 * 1024
+
 _version_paths = {}
 _scan_lock = threading.Lock()
 
@@ -249,7 +254,7 @@ def _do_rescan(lang="ru"):
     with _scan_lock:
         _version_paths.clear()
         _version_paths.update(found)
-    return sorted(_version_paths.keys(), key=zt.natural_key)
+        return sorted(_version_paths.keys(), key=zt.natural_key)
 
 
 def _version_dir(name, lang="ru"):
@@ -261,6 +266,29 @@ def _version_dir(name, lang="ru"):
     if not vd or not vd.exists() or not (vd / "bin" / "winws.exe").exists():
         raise ValueError(t(lang, "err_unknown_version", name=name))
     return vd
+
+
+def _strategy_path(version_dir: Path, name, lang="ru") -> Path:
+    """Resolve a client-supplied strategy name to a path inside version_dir.
+
+    The name is never joined onto version_dir directly. pathlib treats an
+    absolute path on the right of `/` as replacing the left side entirely
+    (`Path("C:/v") / "C:/Windows/System32/calc.exe"` is that calc.exe), and
+    a "../.." name resolves back out of the folder — so both escape a bare
+    .exists() check, which is all the callers used to do.
+
+    That matters here more than almost anywhere else in this file: the
+    server runs elevated, and the result is handed to `cmd /c` or
+    registered as a Windows service binPath. So the name has to match one
+    that find_strategies() actually discovered — the same whitelist
+    _test_start has always used.
+    """
+    if not isinstance(name, str) or not name:
+        raise ValueError(t(lang, "err_strategy_not_found", strategy=name))
+    for bat in zt.find_strategies(version_dir):
+        if bat.name == name:
+            return bat
+    raise ValueError(t(lang, "err_strategy_not_found", strategy=name))
 
 
 # zapret2 (alternative engine) version scan cache — same shape as the
@@ -275,7 +303,7 @@ def _do_rescan_zapret2():
     with _zapret2_scan_lock:
         _zapret2_version_paths.clear()
         _zapret2_version_paths.update(found)
-    return sorted(_zapret2_version_paths.keys(), key=zt.natural_key)
+        return sorted(_zapret2_version_paths.keys(), key=zt.natural_key)
 
 
 def _zapret2_version_dir(name, lang="ru"):
@@ -314,6 +342,8 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0) or 0)
         if length == 0:
             return {}
+        if length > _MAX_BODY_BYTES:
+            raise ValueError(f"request body too large: {length} bytes")
         raw = self.rfile.read(length)
         return json.loads(raw.decode("utf-8")) if raw else {}
 
@@ -357,12 +387,16 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/api/versions":
                 if qs.get("rescan", ["0"])[0] == "1" or not _version_paths:
-                    names = _do_rescan(lang)
-                else:
-                    names = sorted(_version_paths.keys(), key=zt.natural_key)
+                    _do_rescan(lang)
+                # Snapshot under the lock before reading: a background
+                # download finishing on another thread calls _do_rescan(),
+                # which clears and refills this dict, and iterating it
+                # meanwhile raises "dictionary changed size during iteration".
+                with _scan_lock:
+                    snapshot = dict(_version_paths)
                 return self._send_json({
-                    "versions": names,
-                    "paths": {name: str(p) for name, p in _version_paths.items()},
+                    "versions": sorted(snapshot.keys(), key=zt.natural_key),
+                    "paths": {name: str(p) for name, p in snapshot.items()},
                 })
 
             if path == "/api/scan/settings":
@@ -394,12 +428,13 @@ class Handler(BaseHTTPRequestHandler):
 
             if path == "/api/zapret2/versions":
                 if qs.get("rescan", ["0"])[0] == "1" or not _zapret2_version_paths:
-                    names = _do_rescan_zapret2()
-                else:
-                    names = sorted(_zapret2_version_paths.keys(), key=zt.natural_key)
+                    _do_rescan_zapret2()
+                # Same snapshot-under-lock reasoning as /api/versions above.
+                with _zapret2_scan_lock:
+                    snapshot = dict(_zapret2_version_paths)
                 return self._send_json({
-                    "versions": names,
-                    "paths": {name: str(p) for name, p in _zapret2_version_paths.items()},
+                    "versions": sorted(snapshot.keys(), key=zt.natural_key),
+                    "paths": {name: str(p) for name, p in snapshot.items()},
                 })
 
             if path == "/api/zapret2/state":
@@ -644,9 +679,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _manual_launch(self, data, lang):
         vd = _version_dir(data["version"], lang)
-        bat = vd / data["strategy"]
-        if not bat.exists():
-            raise ValueError(t(lang, "err_strategy_not_found", strategy=data["strategy"]))
+        bat = _strategy_path(vd, data.get("strategy"), lang)
         zt.launch_strategy(bat, vd)
         return self._send_json({"ok": True})
 
@@ -672,7 +705,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def _service_install(self, data, lang):
         vd = _version_dir(data["version"], lang)
-        out = zs.install_service(vd, data["strategy"], lang)
+        bat = _strategy_path(vd, data.get("strategy"), lang)
+        out = zs.install_service(vd, bat.name, lang)
         return self._send_json({"ok": True, "output": out})
 
     def _service_remove(self, data, lang):

@@ -12,3 +12,6 @@ zapret2-master/
 zapret2-v1.0.2-release-UNSAFE/
 /zapret/
 zapret-web-panel-debug.spec
+
+# личный лаунчер Claude Code, к панели отношения не имеет
+claude_code_proxy_*.bat

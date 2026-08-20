@@ -97,9 +97,29 @@ def _parse_sc_records(text: str):
     return records
 
 
+def vpn_service_names() -> set:
+    """Names of the services run_diagnostics labels as VPN-ish.
+
+    Recomputed here rather than trusting whatever the client sends back,
+    so `net stop` can only ever be aimed at something this process itself
+    identified as a VPN.
+    """
+    records = _parse_sc_records(_query_all_active_services())
+    return {
+        r["name"] for r in records
+        if "vpn" in r["display_name"].lower() or "vpn" in r["name"].lower()
+    }
+
+
 def stop_services(names, lang="ru") -> str:
+    # The UI sends back a subset of what run_diagnostics reported, but the
+    # request is client-controlled and this runs elevated, so the list is
+    # intersected with a freshly derived set instead of being taken as-is.
+    allowed = vpn_service_names()
     lines = []
     for n in names:
+        if not isinstance(n, str) or n not in allowed:
+            continue
         res = subprocess.run(["net", "stop", n], capture_output=True, text=True, timeout=20)
         ok = res.returncode == 0
         lines.append(f"{n}: {t(lang, 'svc_stopped' if ok else 'svc_stop_failed')}")
@@ -158,6 +178,12 @@ def _extract_winws_command(bat_path: Path, version_dir: Path, lang="ru") -> str:
 
 
 def install_service(version_dir: Path, bat_name: str, lang="ru") -> str:
+    # Defence in depth: callers are expected to have already whitelisted
+    # this name against find_strategies() (see _strategy_path in
+    # zapret_web.py), but taking .name here means even a direct caller
+    # cannot walk out of version_dir with "../.." or an absolute path and
+    # get it registered as an auto-start service running as SYSTEM.
+    bat_name = Path(bat_name).name
     bat_path = version_dir / bat_name
     if not bat_path.exists():
         raise ValueError(t(lang, "install_bat_not_found", bat_name=bat_name, version_dir=version_dir))
@@ -604,8 +630,12 @@ def fix_windivert_conflict(lang="ru") -> str:
 
 
 def remove_conflicting_services(names, lang="ru") -> str:
+    # `sc delete` is irreversible, so the client picks which of the known
+    # conflicting bypass tools to remove — never what that set contains.
     lines = []
     for n in names:
+        if not isinstance(n, str) or n not in CONFLICTING_BYPASS_SERVICES:
+            continue
         subprocess.run(["net", "stop", n], capture_output=True, timeout=15)
         subprocess.run(["sc", "delete", n], capture_output=True, timeout=15)
         lines.append(t(lang, "svc_stopped_removed_maybe", name=n))

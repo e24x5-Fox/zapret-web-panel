@@ -152,6 +152,24 @@ def _download_to_file(url: str, dest: Path, lang="ru") -> str:
     return hasher.hexdigest()
 
 
+def _safe_extractall(zf: zipfile.ZipFile, dest: Path):
+    """extractall() that refuses archive members which would land outside
+    dest ("zip slip").
+
+    zipfile does not check this itself: a member named "../../evil.bat", or
+    one with an absolute path, is written wherever it says. This app
+    extracts archives downloaded over the network while running elevated,
+    and the zapret2 bundle in particular publishes no sha256 to verify the
+    download against, so the archive's own claims are all we have.
+    """
+    dest_resolved = dest.resolve()
+    for member in zf.infolist():
+        target = (dest_resolved / member.filename).resolve()
+        if target != dest_resolved and dest_resolved not in target.parents:
+            raise RuntimeError(f"unsafe path in archive: {member.filename}")
+    zf.extractall(dest)
+
+
 def _extract_flatten(zip_path: Path, dest_parent: Path, folder_name: str, lang="ru") -> Path:
     """Extracts zip_path, flattening a single top-level directory (GitHub's
     convention for both release assets and branch archives) so the result
@@ -164,7 +182,7 @@ def _extract_flatten(zip_path: Path, dest_parent: Path, folder_name: str, lang="
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
         with zipfile.ZipFile(zip_path) as zf:
-            zf.extractall(tmp_path)
+            _safe_extractall(zf, tmp_path)
         entries = list(tmp_path.iterdir())
         content_root = entries[0] if len(entries) == 1 and entries[0].is_dir() else tmp_path
         shutil.move(str(content_root), str(target))

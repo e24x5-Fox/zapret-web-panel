@@ -384,6 +384,12 @@ def save_candidate(engine_dir: Path, texts: dict, candidate_name: str, save_as: 
     if candidate_name not in texts:
         raise ValueError(f"unknown candidate: {candidate_name}")
     safe_name = save_as if save_as.lower().endswith(".cmd") else f"{save_as}.cmd"
+    # Strip any directory part before joining: save_as arrives from the
+    # client, and both "../../evil.cmd" and an absolute "C:/evil.cmd" would
+    # otherwise write outside engine_dir.
+    safe_name = Path(safe_name).name
+    if not safe_name or safe_name == ".cmd":
+        raise ValueError(f"bad file name: {save_as}")
     out_path = engine_dir / safe_name
     out_path.write_text(texts[candidate_name], encoding="utf-8")
     return out_path
