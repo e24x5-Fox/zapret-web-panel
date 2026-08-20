@@ -1,13 +1,23 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-# Smaller-but-riskier variant of zapret-web-panel.spec: same app, packed with
-# UPX to shrink the plain CPython/OpenSSL binaries further. Kept as a
-# SEPARATE spec/output (never overwrites the normal build) because UPX
-# compression is a well-known trigger for antivirus false positives — this
-# is meant as an optional download for users who specifically want the
-# smaller file and accept that tradeoff, not the default distribution.
+# Smaller variant of zapret-web-panel.spec: the same app, minus a few stdlib
+# C-extensions it never reaches at runtime (see the excludes below). Kept as
+# a SEPARATE spec/output so it never overwrites the normal build.
 #
-# upx_exclude intentionally protects every Microsoft-signed / .NET-managed
+# HISTORY, because the release notes got this wrong for two versions: this
+# spec was originally written to also compress the result with UPX, and
+# v1.9.0's notes described the lite build that way and warned users about
+# UPX's reputation for antivirus false positives. In reality upx.exe was
+# never installed on the build machine, so PyInstaller skipped the step in
+# silence and every published lite build has been an ordinary uncompressed
+# exe — verified against the v1.9.2 binaries by their PE section names.
+# The warning therefore scared people away from a file that was no
+# different in that respect from the recommended one. UPX is now off
+# explicitly (see the EXE block) and the size difference comes purely from
+# the excludes, which is about a megabyte.
+#
+# The upx_exclude list below is retained for anyone reviving the UPX
+# variant. It intentionally protects every Microsoft-signed / .NET-managed
 # binary the app depends on (WebView2 loader/assemblies, pythonnet's CLR
 # runtime DLLs, the VC++/UCRT system DLLs) — UPX has known issues repacking
 # .NET assemblies and signed system DLLs, and breaking WebView2Loader.dll
@@ -59,7 +69,12 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    # Off, deliberately — see the note at the top of this file. The
+    # upx_exclude list below is kept intact so the UPX variant can be
+    # revived by flipping this one flag, but it must stay a conscious
+    # decision rather than something that switches itself on depending on
+    # whether the build machine happens to have upx.exe.
+    upx=False,
     upx_exclude=[
         'ucrtbase.dll', 'vcruntime140.dll', 'vcruntime140_1.dll',
         'WebView2Loader.dll', 'Microsoft.Web.WebView2.*.dll',

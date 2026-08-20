@@ -35,6 +35,15 @@ Download `zapret-web-panel.exe` from [Releases](../../releases) and place it nex
 >
 > If in doubt, verify the downloaded file's SHA256 against the one GitHub itself publishes on the release (Assets → the checksum icon) rather than trusting a raw VirusTotal detection count.
 
+#### Which of the two files to take
+
+Each release ships two copies of the app:
+
+- **`zapret-web-panel.exe`** — the regular build. Take this one.
+- **`zapret-web-panel-lite.exe`** — the same app, packed without a couple of unused standard-library modules. About a megabyte smaller, behaves identically.
+
+Nothing else differs between them. In particular, **neither build is UPX-compressed** — the v1.9.0 release notes said the lite one was, but the packer was not actually installed at the time and the compression step was silently skipped. So there is no UPX-related reason to avoid the lite build: both look the same to antivirus engines.
+
 ### Option 2 — from source
 
 ```

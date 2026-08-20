@@ -31,7 +31,12 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    # Explicitly off, not left at PyInstaller's default: that default only
+    # does nothing while upx.exe happens to be absent from PATH, so a build
+    # machine that has UPX installed would silently start shipping a
+    # UPX-packed exe. UPX is a well-known antivirus false-positive trigger,
+    # and this is the build the README recommends to everyone.
+    upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,

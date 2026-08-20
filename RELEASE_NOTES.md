@@ -47,6 +47,8 @@ Another case of a false "forbidden" panel window.
 - `zapret-web-panel.exe` стал заметно легче (~15 МБ вместо ~23 МБ) — сборка теперь собирается в отдельном чистом окружении, а не в общем Python-окружении разработчика, куда со временем попали посторонние библиотеки от других проектов.
 - Добавлена дополнительная сборка `zapret-web-panel-lite.exe` (~13 МБ) — тот же самый апп, но плотнее упакован (UPX-сжатие + отказ от пары неиспользуемых модулей). **Важно**: UPX-сжатие — известный триггер ложных срабатываний антивирусов и Windows Defender. Берите `-lite` версию только если размер файла принципиален; для обычного использования рекомендуется `zapret-web-panel.exe`.
 
+> **Поправка от v1.9.2.** Утверждение про UPX выше неверно. Упаковщик `upx.exe` на машине сборки не был установлен, поэтому PyInstaller молча пропускал шаг сжатия: все опубликованные lite-сборки — обычные несжатые exe (проверено по именам секций PE в бинарниках v1.9.2). Разница в размере получалась только из исключённых модулей. Предупреждение зря отпугивало людей от файла, который в этом отношении ничем не отличался от рекомендованного. Начиная с v1.9.2 UPX отключён в спеках явно.
+
 ---
 
 ## zapret-web-panel v1.9.0 (English)
@@ -57,6 +59,8 @@ The auto-update-check toggle is now a global setting, the app got smaller, and t
 - The "Check for updates" toggle (Service tab, item 6) is no longer tied to a specific installed zapret version. It used to silently reset to "off" whenever you switched to a different version (or reinstalled/updated one) — it's now a single panel-wide setting that automatically applies itself to whichever version is active.
 - `zapret-web-panel.exe` is noticeably smaller now (~15MB, down from ~23MB) — it's built from a dedicated clean environment instead of the developer's general-purpose Python setup, which had accumulated unrelated libraries from other projects over time.
 - Added an extra `zapret-web-panel-lite.exe` build (~13MB) — the same app, packed tighter (UPX compression plus dropping a couple of genuinely-unused modules). **Note**: UPX compression is a well-known trigger for antivirus/Windows Defender false positives. Only grab the `-lite` build if file size specifically matters to you; `zapret-web-panel.exe` is the recommended default for everyday use.
+
+> **Correction, added in v1.9.2.** The UPX claim above is wrong. `upx.exe` was never installed on the build machine, so PyInstaller skipped the compression step in silence: every published lite build has been an ordinary uncompressed exe (verified against the v1.9.2 binaries by their PE section names). The size difference came purely from the excluded modules. The warning scared people away from a file that was no different in that respect from the recommended one. UPX is explicitly disabled in the spec files as of v1.9.2.
 
 ---
 
