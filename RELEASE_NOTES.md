@@ -1,3 +1,25 @@
+## zapret-web-panel v1.9.2
+
+Исправления безопасности. Обновиться стоит всем.
+
+### Что нового
+- Закрыты шесть уязвимостей в бэкенде панели. Самая серьёзная позволяла запустить произвольный файл с правами администратора или зарегистрировать его автозапускаемой службой Windows: панель принимала имя стратегии от интерфейса и не проверяла, что это действительно одна из стратегий выбранной версии. Две другие позволяли записать сгенерированный файл за пределы папки версии и остановить или удалить произвольную службу Windows вместо конфликтующей. Оставшиеся три — распаковка скачанного архива за пределы целевой папки, редкое падение при одновременном сканировании версий и отсутствие ограничения на размер запроса.
+- Панель работает от имени администратора, поэтому цена таких ошибок выше обычной. Воспользоваться ими можно было только с самого компьютера, через локальный API панели — из интернета они недостижимы. Тем не менее обновиться стоит.
+- Добавлен набор автотестов (`test_security.py`), проверяющий каждое из шести исправлений: `python -m unittest test_security`. Раньше проверять их было нечем.
+
+---
+
+## zapret-web-panel v1.9.2 (English)
+
+Security fixes. Everyone should update.
+
+### What's new
+- Six vulnerabilities in the panel's backend are fixed. The most serious one allowed running an arbitrary file with administrator rights, or registering it as an auto-start Windows service: the panel accepted a strategy name from the UI without checking that it really was one of the selected version's strategies. Two others allowed writing a generated file outside the version folder, and stopping or deleting an arbitrary Windows service instead of a conflicting one. The remaining three were extraction of a downloaded archive outside its target folder, a rare crash when version scans overlapped, and a missing limit on request size.
+- The panel runs with administrator rights, which raises the cost of mistakes like these. Exploiting them required access to the panel's local API from the machine itself — they were not reachable from the internet. Updating is still worthwhile.
+- Added a test suite (`test_security.py`) covering each of the six fixes: `python -m unittest test_security`. There was previously no way to verify them.
+
+---
+
 ## zapret-web-panel v1.9.1
 
 Ещё один случай ложного "forbidden" в окне панели.
